@@ -47,35 +47,38 @@ class ApiProcessor(ProcessorServer):
             )
         return organization_dict
 
-    def process_email_by_id(self, message_id: Optional[str], mail_folder: str = 'inbox') -> dict:
-        self.log.warning(f'Starting {message_id} parsing')
-        mail_connector = self.setup_mail_connector()    # mail_connector.list()[1] - list of folders in mailbox
-        mail_connector.select(mail_folder)
-        message_ids = self.upd_index(message_id, mail_folder)
-        orgs_dict = {}
-        if message_ids.get(message_id, 0) != 0:
-            print(message_id, message_ids[message_id])
-            try:
-                data = self.see_msg(mail_connector, mail_id=message_ids[message_id])
-                attach_texts, message_text, _ = self.get_message_attributes(data)
-                organization_dict = self.parse_attributes(attach_texts, message_text)
-                organization = {
-                    k: v for k, v in organization_dict.items()
-                    if '*' not in v['inn']
-                       and '*' not in v['r_account']
-                       and '*' not in v['bik']
-                }
-                orgs_dict.update(organization)
-                self.log.info(organization.keys().__str__())
-                self.log.info(organization.values().__str__())
-            except Exception as ex:
-                self.error_processor(ex)
-                self.log.warning('Email processing failed')
-                return {}
-            self.log.warning('Parsing finished')
-        self.log.warning(orgs_dict.__str__())
-        self.log.warning(len(orgs_dict))
-        return orgs_dict
+    def process_email_by_id(self, message_id: str, mail_folder: str = 'inbox') -> dict:
+        if len(message_id) <= 1:
+            return {}
+        else:
+            self.log.warning(f'Starting {message_id} parsing')
+            mail_connector = self.setup_mail_connector()    # mail_connector.list()[1] - list of folders in mailbox
+            mail_connector.select(mail_folder)
+            message_ids = self.upd_index(message_id, mail_folder)
+            orgs_dict = {}
+            if message_ids.get(message_id, 0) != 0:
+                print(message_id, message_ids[message_id])
+                try:
+                    data = self.see_msg(mail_connector, mail_id=message_ids[message_id])
+                    attach_texts, message_text, _ = self.get_message_attributes(data)
+                    organization_dict = self.parse_attributes(attach_texts, message_text)
+                    organization = {
+                        k: v for k, v in organization_dict.items()
+                        if '*' not in v['inn']
+                           and '*' not in v['r_account']
+                           and '*' not in v['bik']
+                    }
+                    orgs_dict.update(organization)
+                    self.log.info(organization.keys().__str__())
+                    self.log.info(organization.values().__str__())
+                except Exception as ex:
+                    self.error_processor(ex)
+                    self.log.warning('Email processing failed')
+                    return {}
+                self.log.warning('Parsing finished')
+            self.log.warning(orgs_dict.__str__())
+            self.log.warning(len(orgs_dict))
+            return orgs_dict
 
     @staticmethod
     def get_index(mail_connector, mail_id) -> str:
