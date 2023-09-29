@@ -1,4 +1,4 @@
-FROM python:3.11.3-bullseye
+FROM python:3.11.5-slim-bullseye
 
 WORKDIR /app
 RUN echo 'APT::Keep-Downloaded-Packages "false";' \
