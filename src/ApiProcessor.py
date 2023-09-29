@@ -13,6 +13,7 @@ class ApiProcessor(ProcessorServer):
         Processor.__init__(self, log.log)
         ProcessorServer.__init__(self, email, password, server, log)
         self.parser = ApiParsers()
+        self.index_file = 'message_ids.pkl'
 
     @staticmethod
     def org_structure(inn, bik, r_account, tel):
@@ -91,33 +92,33 @@ class ApiProcessor(ProcessorServer):
             return ''
         return idx
 
-    def upd_index(self, message_id: Optional[str], mail_folder: str = 'inbox', last_letters: int = 30):
-        index_file = 'message_ids.pkl'
+    def dump_messages(self, mail_ids, mail_connector, message_ids, last_letters: int = 30):
+        self.log.warning(f'Message-id not found, parsing {last_letters} last items')
+        to_process_list = mail_ids[-last_letters:][::-1]
+        for num, mail_id in enumerate(to_process_list):
+            self.log.warning(f'{num} - {mail_id}')
+            indx = self.get_index(mail_connector, mail_id)
+            if len(indx) > 0 and indx not in message_ids.keys():
+                message_ids[indx] = mail_id
+                self.log.warning(f'{indx} added')
+        with open(self.index_file, 'wb') as fp:
+            pickle.dump(message_ids, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def upd_index(self, message_id: Optional[str], mail_folder: str = 'inbox'):
         mail_connector = self.setup_mail_connector()
         mail_connector.select(mail_folder)
         mail_ids = self.get_mail_ids(mail_folder, seen_tag='UNSEEN') + self.get_mail_ids(mail_folder, seen_tag='SEEN')
 
-        if not os.path.exists(index_file):
-            raise IOError(f'No {index_file} file')
-        else:
-            with open(index_file, 'rb') as fp:
-                message_ids = pickle.load(fp)
-            if message_id in message_ids.keys():
-                self.log.warning('Message-id found')
-                return message_ids
+        if not os.path.exists(self.index_file):
+            logging.error(f'No {self.index_file} file')
+            self.dump_messages(mail_ids, mail_connector, message_ids={}, last_letters=90)
+        with open(self.index_file, 'rb') as fp:
+            message_ids = pickle.load(fp)
+        if message_id in message_ids.keys():
+            self.log.warning('Message-id found')
+            return message_ids
 
-            self.log.warning(f'Message-id not found, parsing {last_letters} last items')
-            to_process_list = mail_ids[-last_letters:][::-1]
-            for num, mail_id in enumerate(to_process_list):
-                self.log.warning(f'{num} - {mail_id}')
-                indx = self.get_index(mail_connector, mail_id)
-                if len(indx) > 0 and indx not in message_ids.keys():
-                    message_ids[indx] = mail_id
-                    self.log.warning(f'{indx} added')
-                if indx == message_id:
-                    break
-            with open(index_file, 'wb') as fp:
-                pickle.dump(message_ids, fp, protocol=pickle.HIGHEST_PROTOCOL)
+        self.dump_messages(mail_ids, mail_connector, message_ids,)
 
         return message_ids
 
