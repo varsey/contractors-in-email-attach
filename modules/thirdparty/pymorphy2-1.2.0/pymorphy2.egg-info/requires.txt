@@ -1,0 +1,6 @@
+dawg-python>=0.7.1
+docopt>=0.6
+pymorphy3-dicts-ru
+
+[fast]
+DAWG>=0.8
