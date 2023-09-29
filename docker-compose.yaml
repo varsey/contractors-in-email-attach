@@ -1,0 +1,17 @@
+version: '2.3'
+services:
+    dev:
+        environment:
+          - SERVER
+          - PASS
+          - EMAIL
+        build:
+          context: ./
+          dockerfile: ./build/Dockerfile
+        image: api-contactor-parser:latest
+        container_name: api-contactor-parser-latest
+        volumes:
+            - ./:/app
+        ports:
+          - 8000:8000
+        command: gunicorn -w 2 --bind 0.0.0.0:8000 app:app
