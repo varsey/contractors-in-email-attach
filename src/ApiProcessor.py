@@ -92,7 +92,7 @@ class ApiProcessor(ProcessorServer):
         index_file = 'message_ids.pkl'
         mail_connector = self.setup_mail_connector()
         mail_connector.select(mail_folder)
-        mail_ids = self.get_mail_ids(mail_folder)
+        mail_ids = self.get_mail_ids(mail_folder, seen_tag='UNSEEN') + self.get_mail_ids(mail_folder, seen_tag='SEEN')
 
         if not os.path.exists(index_file):
             raise IOError(f'No {index_file} file')

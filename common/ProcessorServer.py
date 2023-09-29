@@ -31,8 +31,8 @@ class ProcessorServer(Processor):
             return text
 
         ep = eml_parser.EmlParser(include_raw_body=True, include_attachment_data=True)
-        email, message_text, att_text, attach_name, header_from = '', '', '', '', ''
-        attach_names, full_texts, attach_texts = [], [], {}
+        _, message_text, _, attach_name, header_from = '', '', '', '', ''
+        attach_names, _, attach_texts = [], [], {}
         for response_part in data:
             if isinstance(response_part, tuple):
                 parsed_eml = ep.decode_email_bytes(response_part[1])
@@ -51,13 +51,13 @@ class ProcessorServer(Processor):
 
     @staticmethod
     def see_msg(mail_connector: imaplib, mail_id, message_parts: str = '(BODY.PEEK[])') -> imaplib:
-        return mail_connector.fetch(mail_id, message_parts)[1]   # не помечать seen - '(BODY.PEEK[])', otherwise - 'RFC822'
+        return mail_connector.fetch(mail_id, message_parts)[1]   # not mark as seen: '(BODY.PEEK[])', otherwise 'RFC822'
 
     def get_mail_ids(self, mail_folder: str, seen_tag: str = 'SEEN') -> list:
         mail_ids = []
         mail_connector = self.setup_mail_connector()
         mail_connector.select(mail_folder)
-        for block in mail_connector.search(None, f'({seen_tag})')[1]:    # UNSEEN SINCE "23-Nov-2022"
+        for block in mail_connector.search(None, f'({seen_tag})')[1]:
             mail_ids += block.split()
         return mail_ids
 
