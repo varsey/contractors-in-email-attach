@@ -1,10 +1,8 @@
 version: '2'
 services:
     dev:
-        environment:
-          - SERVER:${SERVER}
-          - PASS=${PASS}
-          - EMAIL=${EMAIL}
+        env_file:
+          - .env
         build:
           context: ./
           dockerfile: ./build/Dockerfile
