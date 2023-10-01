@@ -80,9 +80,8 @@ class ApiParsers:
         if len(sewed_inn) > 11:
             # физлицо
             return sewed_inn[:12]
-        else:
-            # юрлицо
-            return sewed_inn[:10]
+        # юрлицо
+        return sewed_inn[:10]
 
     @staticmethod
     def parse_r_account(card):
@@ -128,7 +127,8 @@ class ApiParsers:
                         and x.isnumeric()
                         and x[:3] in ('406', '407', '408')
                         and x[3:5] in ('01', '02', '03')]
-            r_account = cadidate[0]
+            if len(cadidate) >= 1:
+                r_account = cadidate[0]
 
         print('r_account', r_account)
         return ''.join(re.findall(r'\d+', r_account))

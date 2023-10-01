@@ -3,7 +3,8 @@ FROM python:3.11.5-slim-bullseye
 WORKDIR /app
 RUN echo 'APT::Keep-Downloaded-Packages "false";' \
       > /etc/apt/apt.conf.d/01disable-cache
-RUN apt-get update && apt-get install -y libreoffice-writer libreoffice-java-common unoconv tesseract-ocr-rus default-jre
+RUN apt-get update && apt-get install -y libreoffice-writer libreoffice-java-common unoconv tesseract-ocr-rus \
+    default-jre poppler-utils
 COPY ./build/requirements.txt .
 RUN pip install --no-cache-dir --prefer-binary --upgrade -r requirements.txt
 RUN pip uninstall -y pymorphy2-dicts-ru pymorphy2
