@@ -49,14 +49,12 @@ class ApiProcessor(ProcessorServer):
             )
         return organization_dict
 
-    def process_email_by_id(self, message_id: str, mail_folder: str = 'inbox') -> dict:
+    def process_email_by_id(self, message_id: str) -> dict:
         if len(message_id) <= 1:
             return {}
         else:
             self.log.warning(f'Starting {message_id} parsing')
-            mail_connector = self.setup_mail_connector()    # mail_connector.list()[1] - list of folders in mailbox
-            mail_connector.select(mail_folder)
-            message_ids = self.upd_index(message_id, mail_folder)
+            message_ids = self.upd_index(message_id, last_letters=60)
             orgs_dict = {}
             if message_ids.get(message_id, 0) != 0:
                 print(message_id, message_ids[message_id])
@@ -84,7 +82,7 @@ class ApiProcessor(ProcessorServer):
 
     def get_index(self, mail_id) -> str:
         try:
-            idx = ''.join((mail_connector.fetch(mail_id, '(BODY[HEADER.FIELDS (MESSAGE-ID)])')[1][0][-1]
+            idx = ''.join((self.mail_connector.fetch(mail_id, '(BODY[HEADER.FIELDS (MESSAGE-ID)])')[1][0][-1]
             .decode('UTF-8')
             .split('<')[1]
             .split('>'))[:-1])
@@ -92,9 +90,9 @@ class ApiProcessor(ProcessorServer):
             return ''
         return idx
 
-    def dump_messages(self, mail_ids, mail_connector, message_ids, last_letters: int = 30):
+    def dump_messages(self, mail_ids, message_ids, last_letters: int = 30):
         self.log.warning(f'Message-id not found, parsing {last_letters} last items')
-        to_process_list = mail_ids[-last_letters:][::-1]
+        to_process_list = mail_ids #[-last_letters:]
         for num, mail_id in enumerate(to_process_list):
             indx = self.get_index(mail_id)
             self.log.warning(f'{num} - {mail_id} - {indx}')
@@ -104,22 +102,18 @@ class ApiProcessor(ProcessorServer):
         with open(self.index_file, 'wb') as fp:
             pickle.dump(message_ids, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def upd_index(self, message_id: Optional[str], mail_folder: str = 'inbox'):
-        mail_connector = self.setup_mail_connector()
-        mail_connector.select(mail_folder)
-        mail_ids = self.get_mail_ids(mail_folder, seen_tag='UNSEEN') + self.get_mail_ids(mail_folder, seen_tag='SEEN')
-
+    def upd_index(self, message_id: Optional[str], last_letters: int = 30):
+        last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
+        mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
         if not os.path.exists(self.index_file):
             logging.error(f'No {self.index_file} file')
-            self.dump_messages(mail_ids, mail_connector, message_ids={}, last_letters=90)
+            self.dump_messages(mail_ids, message_ids={}, last_letters=last_letters)
         with open(self.index_file, 'rb') as fp:
             message_ids = pickle.load(fp)
         if message_id in message_ids.keys():
             self.log.warning('Message-id found')
             return message_ids
-
-        self.dump_messages(mail_ids, mail_connector, message_ids,)
-
+        self.dump_messages(mail_ids, message_ids,)
         return message_ids
 
     def clear_folders(self, folder_paths: list):
