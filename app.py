@@ -8,9 +8,10 @@ from src.ApiProcessor import ApiProcessor
 app = Flask(__name__)
 
 email, password, server = os.getenv("EMAIL"), os.getenv('PASS'), os.getenv('SERVER')
+mail_folder = 'inbox'
 
 logger = Logger()
-prc = ApiProcessor(email, password, server, logger)
+prc = ApiProcessor(email, password, server, mail_folder, logger)
 
 
 @app.route("/")
@@ -27,7 +28,7 @@ def contractor_parser_url(email_id: str):
 @app.route("/api/parsing/")
 def contractor_parser_parameter():
     email_id = request.args.get('mid')
-    card = prc.process_email_by_id(message_id=email_id, mail_folder='inbox')
+    card = prc.process_email_by_id(message_id=email_id)
     return jsonify(card)
 
 

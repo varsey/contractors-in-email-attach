@@ -9,11 +9,12 @@ from common.ProcessorServer import ProcessorServer
 
 
 class ApiProcessor(ProcessorServer):
-    def __init__(self, email: str, password: str, server: str, log: logging):
+    def __init__(self, email: str, password: str, server: str, mail_folder: str, log: logging):
         Processor.__init__(self, log.log)
-        ProcessorServer.__init__(self, email, password, server, log)
+        ProcessorServer.__init__(self, email, password, server, mail_folder, log)
         self.parser = ApiParsers()
         self.index_file = 'message_ids.pkl'
+        self.mail_folder = mail_folder
 
     @staticmethod
     def org_structure(inn, bik, r_account, tel):
@@ -60,7 +61,7 @@ class ApiProcessor(ProcessorServer):
             if message_ids.get(message_id, 0) != 0:
                 print(message_id, message_ids[message_id])
                 try:
-                    data = self.see_msg(mail_connector, mail_id=message_ids[message_id])
+                    data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
                     attach_texts, message_text, _ = self.get_message_attributes(data)
                     organization_dict = self.parse_attributes(attach_texts, message_text)
                     organization = {
@@ -81,8 +82,7 @@ class ApiProcessor(ProcessorServer):
             self.log.warning(len(orgs_dict))
             return orgs_dict
 
-    @staticmethod
-    def get_index(mail_connector, mail_id) -> str:
+    def get_index(self, mail_id) -> str:
         try:
             idx = ''.join((mail_connector.fetch(mail_id, '(BODY[HEADER.FIELDS (MESSAGE-ID)])')[1][0][-1]
             .decode('UTF-8')
@@ -96,8 +96,8 @@ class ApiProcessor(ProcessorServer):
         self.log.warning(f'Message-id not found, parsing {last_letters} last items')
         to_process_list = mail_ids[-last_letters:][::-1]
         for num, mail_id in enumerate(to_process_list):
-            self.log.warning(f'{num} - {mail_id}')
-            indx = self.get_index(mail_connector, mail_id)
+            indx = self.get_index(mail_id)
+            self.log.warning(f'{num} - {mail_id} - {indx}')
             if len(indx) > 0 and indx not in message_ids.keys():
                 message_ids[indx] = mail_id
                 self.log.warning(f'{indx} added')

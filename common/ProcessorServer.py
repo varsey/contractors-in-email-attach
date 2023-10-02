@@ -7,11 +7,12 @@ from .Processor import Processor
 
 
 class ProcessorServer(Processor):
-    def __init__(self, email: str, password: str, server: str, log: logging):
+    def __init__(self, email: str, password: str, server: str, mail_folder: str, log: logging):
         Processor.__init__(self, log.log)
-        self.email = email
-        self.password = password
-        self.server = server
+        self.mail_connector = imaplib.IMAP4_SSL(server)
+        self.mail_connector.login(email, password)
+        self.sel = self.mail_connector.select(mail_folder) # mail_connector.list()[1] - list of folders in mailbox
+        self.latest_email_num = self.sel[1] if self.sel[0] == 'OK' else None
 
     def get_message_attributes(self, data) -> (dict, str, str):
 
@@ -53,23 +54,15 @@ class ProcessorServer(Processor):
     def see_msg(mail_connector: imaplib, mail_id, message_parts: str = '(BODY.PEEK[])') -> imaplib:
         return mail_connector.fetch(mail_id, message_parts)[1]   # not mark as seen: '(BODY.PEEK[])', otherwise 'RFC822'
 
-    def get_mail_ids(self, mail_folder: str, seen_tag: str = 'SEEN') -> list:
+    def get_mail_ids(self, tag: str = 'SEEN') -> list:
         mail_ids = []
-        mail_connector = self.setup_mail_connector()
-        mail_connector.select(mail_folder)
-        for block in mail_connector.search(None, f'({seen_tag})')[1]:
+        for block in self.mail_connector.search(None, f'({tag})')[1]:
             mail_ids += block.split()
+        print(len(mail_ids))
         return mail_ids
-
-    def setup_mail_connector(self) -> imaplib:
-        mail_connector = imaplib.IMAP4_SSL(self.server)
-        mail_connector.login(self.email, self.password)
-        return mail_connector
 
     def process_email(self, mail_folder: str, msg_id: Optional[str], start_point: int = 0) -> dict:
         """Email message from gmail"""
-        mail_connector = self.setup_mail_connector()
-        mail_connector.select(mail_folder)
         if msg_id is not None:
             self.log.info(f'With with a single id {msg_id}')
             to_process_list = [msg_id]
@@ -80,7 +73,7 @@ class ProcessorServer(Processor):
         orgs_dict = {}
         for mail_id in to_process_list:
             try:
-                data = self.see_msg(mail_connector, mail_id)
+                data = self.see_msg(self.mail_connector, mail_id)
                 attach_texts, message_text, header_from = self.get_message_attributes(data)
                 organization_dict = self.parse_attributes(attach_texts, message_text, header_from)
                 # filter if any field has * - doubts on correctness
@@ -93,13 +86,11 @@ class ProcessorServer(Processor):
 
         return orgs_dict
 
-    def is_next_day(self, mail_folder: str, start_point: int = 2) -> bool:
-        mail_connector = self.setup_mail_connector()
-        mail_connector.select(mail_folder)
-        mail_ids = self.get_mail_ids(mail_folder, '(SEEN)')
+    def is_next_day(self, start_point: int = 2) -> bool:
+        mail_ids = self.get_mail_ids('(SEEN)')
         dates, day_names = [], []
         for mail_id in mail_ids[-start_point:]:
-            data = self.see_msg(mail_connector, mail_id)
+            data = self.see_msg(self.mail_connector, mail_id)
             ep = eml_parser.EmlParser(include_raw_body=True, include_attachment_data=True)
             for response_part in data:
                 if isinstance(response_part, tuple):
@@ -112,13 +103,11 @@ class ProcessorServer(Processor):
             return True
         return False
 
-    def get_messages_for_ml(self, mail_folder: str, start_point: int = 90) -> list:
+    def get_messages_for_ml(self, start_point: int = 90) -> list:
         messages = []
-        mail_connector = self.setup_mail_connector()
-        mail_connector.select(mail_folder)
-        mail_ids = self.get_mail_ids(mail_folder, '(SEEN)')
+        mail_ids = self.get_mail_ids('(SEEN)')
         for mail_id in mail_ids[-start_point:]:
-            data = self.see_msg(mail_connector, mail_id, '(BODY.PEEK[])')
+            data = self.see_msg(self.mail_connector, mail_id, '(BODY.PEEK[])')
             ep = eml_parser.EmlParser(include_raw_body=True, include_attachment_data=True)
             message_text = ''
             for response_part in data:
