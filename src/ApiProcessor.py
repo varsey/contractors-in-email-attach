@@ -15,6 +15,7 @@ class ApiProcessor(ProcessorServer):
         self.parser = ApiParsers()
         self.index_file = 'message_ids.pkl'
         self.mail_folder = mail_folder
+        self.last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
 
     @staticmethod
     def org_structure(inn, bik, r_account, tel):
@@ -103,7 +104,12 @@ class ApiProcessor(ProcessorServer):
             pickle.dump(message_ids, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
     def upd_index(self, message_id: Optional[str], last_letters: int = 30):
-        last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
+        try:
+            last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
+            self.last_indx = last_indx
+        except Exception as ex:
+            last_indx = self.last_indx + 1
+            logging.error(ex)
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
         if not os.path.exists(self.index_file):
             logging.error(f'No {self.index_file} file')
