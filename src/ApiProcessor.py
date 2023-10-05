@@ -82,7 +82,7 @@ class ApiProcessor(ProcessorServer):
 
     def get_index(self, mail_id) -> str:
         try:
-            idx = ''.join((self.mail_connector.fetch(mail_id, '(BODY[HEADER.FIELDS (MESSAGE-ID)])')[1][0][-1]
+            idx = ''.join((self.mail_connector.fetch(mail_id, '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])')[1][0][-1] # BODY.PEEK[])
             .decode('UTF-8')
             .split('<')[1]
             .split('>'))[:-1])
