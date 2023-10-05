@@ -1,3 +1,4 @@
+import gc
 import os
 from flask import Flask, jsonify, request
 
@@ -29,6 +30,7 @@ def contractor_parser_url(email_id: str):
 def contractor_parser_parameter():
     email_id = request.args.get('mid')
     card = prc.process_email_by_id(message_id=email_id)
+    gc.collect()
     return jsonify(card)
 
 
