@@ -9,10 +9,16 @@ from .Processor import Processor
 class ProcessorServer(Processor):
     def __init__(self, email: str, password: str, server: str, mail_folder: str, log: logging):
         Processor.__init__(self, log.log)
-        self.mail_connector = imaplib.IMAP4_SSL(server)
-        self.mail_connector.login(email, password)
-        self.sel = self.mail_connector.select(mail_folder) # mail_connector.list()[1] - list of folders in mailbox
-        self.latest_email_num = self.sel[1] if self.sel[0] == 'OK' else None
+        self.email = email
+        self.password = password
+        self.server = server
+        self.mail_folder = mail_folder
+
+    def setup_mail_connector(self):
+        self.mail_connector = imaplib.IMAP4_SSL(self.server)
+        self.mail_connector.login(self.email, self.password)
+        self.sel = self.mail_connector.select(self.mail_folder) # mail_connector.list()[1] - list of folders in mailbox
+        return self.mail_connector
 
     def get_message_attributes(self, data) -> (dict, str, str):
 
