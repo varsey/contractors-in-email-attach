@@ -14,5 +14,6 @@ class Logger:
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter(self.LOG_FORMAT))
         logger.addHandler(handler)
-        logger.addHandler(handlers.TimedRotatingFileHandler(log_name, when='D', interval=15, backupCount=1))
+        # M - minutes, 24*60*15 - 15 days
+        logger.addHandler(handlers.TimedRotatingFileHandler(log_name, when='M', interval=24*60*15, backupCount=1))
         self.log = logger
