@@ -15,9 +15,12 @@ class ProcessorServer(Processor):
         self.mail_folder = mail_folder
 
     def setup_mail_connector(self):
-        self.mail_connector = imaplib.IMAP4_SSL(self.server)
-        self.mail_connector.login(self.email, self.password)
-        self.sel = self.mail_connector.select(self.mail_folder) # mail_connector.list()[1] - list of folders in mailbox
+        try:
+            self.mail_connector = imaplib.IMAP4_SSL(self.server)
+            self.mail_connector.login(self.email, self.password)
+            self.sel = self.mail_connector.select(self.mail_folder) # mail_connector.list()[1] - list of folders in mailbox
+        except Exception as e:
+            self.log.error('Cannot connect, check connection params')
         return self.mail_connector
 
     def get_message_attributes(self, data) -> (dict, str, str):

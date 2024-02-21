@@ -1,5 +1,6 @@
 import gc
 import os
+
 from flask import Flask, jsonify, request
 
 from common.Logger import Logger
@@ -8,8 +9,10 @@ from src.ApiProcessor import ApiProcessor
 
 app = Flask(__name__)
 
-email, password, server = os.getenv("EMAIL"), os.getenv('PASS'), os.getenv('SERVER')
 mail_folder = 'inbox'
+email, password, server = os.getenv("EMAIL"), os.getenv('PASS'), os.getenv('SERVER')
+if any(v is None for v in [email, password, server]):
+    raise ValueError(f"One of the EMAIL, PASS, SERVER parameter is not set")
 
 logger = Logger()
 prc = ApiProcessor(email, password, server, mail_folder, logger)
