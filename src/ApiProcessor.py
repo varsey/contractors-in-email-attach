@@ -78,6 +78,7 @@ class ApiProcessor(ProcessorServer):
                 self.log.warning('Parsing finished')
             self.log.warning(orgs_dict.__str__())
             self.log.warning(len(orgs_dict))
+            self.clear_folders([f'{os.getcwd()}/temp/'])
             return orgs_dict
 
     def get_index(self, mail_id) -> str:
@@ -92,7 +93,7 @@ class ApiProcessor(ProcessorServer):
 
     def dump_messages(self, mail_ids, message_ids, last_letters: int = 30):
         self.log.warning(f'Message-id not found, parsing {last_letters} last items')
-        to_process_list = mail_ids #[-last_letters:]
+        to_process_list = mail_ids
         for num, mail_id in enumerate(to_process_list):
             indx = self.get_index(mail_id)
             self.log.warning(f'{num} - {mail_id} - {indx}')

@@ -16,7 +16,7 @@ from PIL import Image
 
 class Processor:
     def __init__(self, log):
-        self.tmp_fldr = os.getcwd() + '/temp/'
+        self.tmp_fldr = f'{os.getcwd()}/temp/'
         self.docx_ext = '.docx'
         self.log = log
 
