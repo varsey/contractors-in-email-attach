@@ -27,13 +27,11 @@ class ApiProcessor(ProcessorServer):
 
     def parse_attributes(self, attach_texts: dict, message_text: str) -> dict:
         organization_dict = {}
-        self.log.info(self.parser.clean_text(message_text))
         for attach_name, full_text in attach_texts.items():
             self.log.info(f'Processing attachment: {attach_name}')
             card = self.parser.clean_text(full_text)  # full_text att_text
-            self.log.info(['card: ', card])
-            self.log.info(['full_text: ', full_text])
-            self.log.info(card) if card else self.log.info('No card found')
+            if not card:
+                self.log.info('No card found')
 
             inn = self.parser.parse_inn(card.lower())
             bik = self.parser.parse_bik(card)
@@ -56,30 +54,31 @@ class ApiProcessor(ProcessorServer):
             self.log.warning(f'Starting {message_id} parsing')
             message_ids = self.upd_index(message_id, last_letters=60)
             orgs_dict = {}
-            if message_ids.get(message_id, 0) != 0:
-                print(message_id, message_ids[message_id])
+            if message_ids.get(message_id, 0) != 0:     # for message_id in list(message_ids.keys())[:20]:
                 try:
                     data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
                     attach_texts, message_text, _ = self.get_message_attributes(data)
                     organization_dict = self.parse_attributes(attach_texts, message_text)
-                    organization = {
-                        k: v for k, v in organization_dict.items()
-                        if '*' not in v['inn']
-                           and '*' not in v['r_account']
-                           and '*' not in v['bik']
-                    }
+                    organization = self.compose_organizations(organization_dict)
                     orgs_dict.update(organization)
-                    self.log.info(organization.keys().__str__())
-                    self.log.info(organization.values().__str__())
                 except Exception as ex:
                     self.error_processor(ex)
-                    self.log.warning('Email processing failed')
+                    self.log.error('Email processing failed')
                     return {}
                 self.log.warning('Parsing finished')
-            self.log.warning(orgs_dict.__str__())
-            self.log.warning(len(orgs_dict))
+            self.log.warning(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
             self.clear_folders([f'{os.getcwd()}/temp/'])
             return orgs_dict
+
+    def compose_organizations(self, organization_dict: dict) -> dict:
+        organization = {
+            k: v for k, v in organization_dict.items()
+            if '*' not in v['inn']
+               and '*' not in v['r_account']
+               and '*' not in v['bik']
+        }
+        self.log.info(f'{organization}')
+        return organization
 
     def get_index(self, mail_id) -> str:
         try:
@@ -91,8 +90,7 @@ class ApiProcessor(ProcessorServer):
             return ''
         return idx
 
-    def dump_messages(self, mail_ids, message_ids, last_letters: int = 30):
-        self.log.warning(f'Message-id not found, parsing {last_letters} last items')
+    def dump_messages(self, mail_ids, message_ids):
         to_process_list = mail_ids
         for num, mail_id in enumerate(to_process_list):
             indx = self.get_index(mail_id)
@@ -107,10 +105,9 @@ class ApiProcessor(ProcessorServer):
         self.setup_mail_connector()
         last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
-        print(mail_ids)
         if not os.path.exists(self.index_file):
-            logging.error(f'No {self.index_file} file')
-            self.dump_messages(mail_ids, message_ids={}, last_letters=last_letters)
+            logging.warning(f'No {self.index_file} file, creating one for {last_letters} last items')
+            self.dump_messages(mail_ids, message_ids={})
         with open(self.index_file, 'rb') as fp:
             message_ids = pickle.load(fp)
         if message_id in message_ids.keys():

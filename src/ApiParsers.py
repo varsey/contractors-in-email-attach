@@ -53,14 +53,12 @@ class ApiParsers:
 
         inn = ''
         for match in parser_inn.findall(card):
-            print([x.value.lower() for x in match.tokens])
             if True not in ['банка' in x.value.lower() for x in match.tokens]:
                 if len([x.value for x in match.tokens]) == 4:
                     inn = ' '.join([x.value for x in match.tokens[1:]]).split(' ')[-2]
                 if len(inn) == 0:
                     inn = ' '.join([x.value for x in match.tokens[1:]]).replace(' ', '')
                 if 'банк' not in card.split(inn)[0][-110:]:
-                    # print(str([x.value for x in match.tokens]) + ' - ' + str(inn))
                     break
 
         if len(inn) == 0 and 'инн' in card.lower():
@@ -75,7 +73,6 @@ class ApiParsers:
             if len(cadidate) == 1:
                 inn = cadidate[0]
 
-        print('inn', inn)
         sewed_inn = ''.join(re.findall(r'\d+', inn.__str__()))
         if len(sewed_inn) > 11:
             # физлицо
@@ -113,7 +110,6 @@ class ApiParsers:
 
         r_account = ''
         for match in parser_r_account1.findall(card):
-            print([x.value for x in match.tokens])
             r_account = ' '.join([x.value for x in match.tokens[2:]]).replace(' ', '')
 
         if len(r_account) == 0:
@@ -130,7 +126,6 @@ class ApiParsers:
             if len(cadidate) >= 1:
                 r_account = cadidate[0]
 
-        print('r_account', r_account)
         return ''.join(re.findall(r'\d+', r_account))
 
     @staticmethod
@@ -144,7 +139,6 @@ class ApiParsers:
         parser_bik = Parser(rule_bik)
         bik = ''
         for match in parser_bik.findall(card):
-            print([x.value for x in match.tokens[1:]])
             bik = ''.join([x.value for x in match.tokens[1:]])
 
         if len(bik) == 0 and 'бик' in card.lower():
@@ -159,11 +153,9 @@ class ApiParsers:
             if len(cadidate) == 1:
                 bik = cadidate[0]
 
-        print('bik', bik)
         return ''.join(re.findall(r'\d+', bik.__str__()))[:9]
 
     def parse_tel(self, card):
-        print(card)
         mask = r'\d\s\d{3}\s\d{3}\s\d{2}\s\d{2}'
         if len(card.lower().split('моб тел ')) >= 2:
             tel_part = card.lower().split('моб тел')
@@ -189,7 +181,6 @@ class ApiParsers:
         else:
             return ''
 
-        print('tel_part', tel_part)
         return tel if len(tel) == 11 else ''
 
     def clean_text(self, text):
