@@ -20,7 +20,7 @@ class ProcessorServer(Processor):
             self.mail_connector.login(self.email, self.password)
             self.sel = self.mail_connector.select(self.mail_folder) # mail_connector.list()[1] - list of folders in mailbox
         except Exception as e:
-            self.log.error('Cannot connect, check connection params')
+            self.log.error(f'Cannot connect, check connection params {e}')
         return self.mail_connector
 
     def get_message_attributes(self, data) -> (dict, str, str):
@@ -54,6 +54,7 @@ class ProcessorServer(Processor):
                         full_text = _parsing_wrapper(attachment_path)
                         attach_texts[attach_name] = full_text
                     except Exception as ex:
+                        self.log.error(f'{ex}')
                         self.error_processor(ex)
                         continue
 
