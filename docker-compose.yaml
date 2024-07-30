@@ -1,6 +1,12 @@
-version: '2'
+version: '3.7'
 services:
     dev:
+        deploy:
+          resources:
+            limits:
+              memory: 3500M
+            reservations:
+              memory: 2000M
         env_file:
           - .env
         build:
@@ -10,6 +16,7 @@ services:
         container_name: api-contactor-parser-latest
         volumes:
             - ./:/app
+        restart: always
         ports:
-          - 8000:8000
+          - "8000:8000"
         command: gunicorn -w 1 --bind 0.0.0.0:8000 --timeout 1200 app:app
