@@ -5,6 +5,7 @@ import PyPDF2
 import docx2txt
 import html2text
 import traceback
+
 from docx import Document
 from docx.opc import exceptions
 from .Parsers import Parsers
@@ -73,7 +74,11 @@ class Processor:
         document = open(filename, 'rb')
         pdf_reader = PyPDF2.PdfReader(document)
         page = pdf_reader.pages[0]
-        full_text = page.extract_text()
+        try:
+            full_text = page.extract_text()
+        except UnicodeDecodeError as ex:
+            full_text = ''
+            self.error_processor(ex)
 
         # OCR parsing
         if len(full_text) == 0:
