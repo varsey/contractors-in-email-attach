@@ -69,7 +69,7 @@ class ApiProcessor(ProcessorServer):
                     return {}
                 self.log.warning('Parsing finished')
             self.log.warning(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
-            # self.clear_folders([f'{os.getcwd()}/temp/'])
+            self.clear_folders([f'{os.getcwd()}/temp/'])
             return orgs_dict
 
     def compose_organizations(self, organization_dict: dict) -> dict:
