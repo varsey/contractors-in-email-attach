@@ -13,14 +13,14 @@ services:
           timeout: 10s
           retries: 3
         env_file:
-          - .env
+          - ../.env
         build:
-          context: ./
-          dockerfile: ./build/Dockerfile
+          context: ..
+          dockerfile: Dockerfile
         image: api-contactor-parser:latest
         container_name: api-contactor-parser-latest
         volumes:
-            - ./:/app
+            - .././:/app
         restart: always
         ports:
           - "8000:8000"
