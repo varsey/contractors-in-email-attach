@@ -45,6 +45,7 @@ class ApiProcessor(ProcessorServer):
             organization_dict[org_key] = self.org_structure(
                 inn, bik, r_account, tel
             )
+            self.log.info(f'Raw org data: {inn=} {bik=} {r_account=} {tel=}')
         return organization_dict
 
     def process_email_by_id(self, message_id: str) -> dict:
@@ -55,6 +56,7 @@ class ApiProcessor(ProcessorServer):
             message_ids = self.upd_index(message_id, last_letters=60)
             orgs_dict = {}
             if message_ids.get(message_id, 0) != 0:     # for message_id in list(message_ids.keys())[:20]:
+            # for message_id in list(message_ids.keys())[:1000]:
                 try:
                     data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
                     attach_texts, message_text, _ = self.get_message_attributes(data)
@@ -67,7 +69,7 @@ class ApiProcessor(ProcessorServer):
                     return {}
                 self.log.warning('Parsing finished')
             self.log.warning(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
-            self.clear_folders([f'{os.getcwd()}/temp/'])
+            # self.clear_folders([f'{os.getcwd()}/temp/'])
             return orgs_dict
 
     def compose_organizations(self, organization_dict: dict) -> dict:

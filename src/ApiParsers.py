@@ -33,7 +33,8 @@ regions = {'01' :  'Республика Адыгея (Адыгея)', '02' : '�
            '83' : 'Ненецкий автономный округ', '86' : 'Ханты-Мансийский автономный округ - Югра',
            '87' : 'Чукотский автономный округ', '89' : 'Ямало-Ненецкий автономный округ',
            '91' : 'Республика Крым', '92' : 'г. Севастополь',
-           '99' : 'Иные территории, включая город и космодром Байконур'
+           '99' : 'Иные территории, включая город и космодром Байконур',
+           '97' : 'Москва',
            }
 
 
@@ -58,19 +59,22 @@ class ApiParsers:
                     inn = ' '.join([x.value for x in match.tokens[1:]]).split(' ')[-2]
                 if len(inn) == 0:
                     inn = ' '.join([x.value for x in match.tokens[1:]]).replace(' ', '')
-                if 'банк' not in card.split(inn)[0][-110:]:
-                    break
+                if 'банк' in card.split(inn)[0][-110:]:
+                    inn = ''
 
         if len(inn) == 0 and 'инн' in card.lower():
-            inn = card.lower().split('инн')[-1]
-            inn = [x for x in inn.split(' ') if len(x) > 0 and not x[0].isalpha()]
-            if len(inn) >= 1:
-                inn = inn[0]
+            for card_part in card.split('инн', maxsplit=card.count('инн')):
+                part = card_part.lower().split('инн')[-1]
+                inn_candidate = [x for x in part.split(' ') if len(x) > 0 and not x[0].isalpha()]
+                if len(inn_candidate) >= 1 and 'банк' not in card.split(inn_candidate[0])[0][-110:]:
+                    inn = inn_candidate[0]
 
         if len(inn) not in (12, 10):
             cadidates = [x for x in card.split()]
-            cadidate = [x for x in cadidates if len(x) in (12, 10) and x.isnumeric() and x[:2] in regions.keys()]
-            if len(cadidate) == 1:
+            cadidate = [x for x in cadidates
+                        if len(x) in (12, 10) and x.isnumeric() and x[:2] in regions.keys()
+                        and x != '7707083893']  # exclude sber inn
+            if len(cadidate) >= 1:
                 inn = cadidate[0]
 
         sewed_inn = ''.join(re.findall(r'\d+', inn.__str__()))
