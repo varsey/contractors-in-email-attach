@@ -15,6 +15,6 @@ RUN sed -i 's/env //' /usr/bin/unoconv
 
 COPY common ./common
 
-ENV J_XMX "3348m"
-ENV J_XMS "1024m"
+ENV J_XMX="3348m"
+ENV J_XMS="1024m"
 CMD [ "gunicorn", "-w", "2", "--bind", "0.0.0.0:8000", "app:app" ]
