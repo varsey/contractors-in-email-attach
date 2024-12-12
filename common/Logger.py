@@ -11,9 +11,11 @@ class Logger:
         logger_name = os.uname().nodename
         logger = logging.getLogger(logger_name)
         logging.basicConfig(filename=log_name, encoding='utf-8', level=logging.INFO, format=self.LOG_FORMAT)
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter(self.LOG_FORMAT))
-        logger.addHandler(handler)
+        # handler = logging.StreamHandler(sys.stdout)
+        # handler.setFormatter(logging.Formatter(self.LOG_FORMAT))
+        # logger.addHandler(handler)
         # M - minutes, 24*60*15 - 15 days
-        logger.addHandler(handlers.TimedRotatingFileHandler(log_name, when='M', interval=24*60*15, backupCount=1))
+        handler2 = handlers.TimedRotatingFileHandler(log_name, when='midnight', backupCount=15)
+        handler2.setFormatter(logging.Formatter(self.LOG_FORMAT))
+        logger.addHandler(handler2)
         self.log = logger

@@ -1,5 +1,6 @@
 import gc
 import os
+import logging
 
 from flask import Flask, jsonify, request
 
@@ -17,17 +18,12 @@ if any(v is None for v in [email, password, server]):
 logger = Logger()
 prc = ApiProcessor(email, password, server, mail_folder, logger)
 
+logging.getLogger('pymorphy2.opencorpora_dict.wrapper').setLevel(logging.ERROR)
+
 
 @app.route("/")
 def route_status():
     return "This is contractor parser"
-
-
-@app.route("/api/parse/<email_id>/")
-def contractor_parser_url(email_id: str):
-    """Deprecated method, use /api/parsing/ insted"""
-    card = prc.process_email_by_id(message_id=email_id)
-    return jsonify(card)
 
 
 @app.route("/api/parsing/")

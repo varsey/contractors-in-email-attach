@@ -156,7 +156,7 @@ class ApiParsers:
             cadidate = [x for x in cadidates if len(x) == 9 and x.isnumeric() and x[:2] == '04']
             if len(cadidate) == 1:
                 bik = cadidate[0]
-
+        bik = bik.replace('О', '0')
         return ''.join(re.findall(r'\d+', bik.__str__()))[:9]
 
     def parse_tel(self, card):

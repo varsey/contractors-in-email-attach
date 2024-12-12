@@ -41,5 +41,5 @@ class ProcessorLocal(Processor):
             organization_dict = {k: v for k, v in organization_dict.items() if '*' not in ''.join(v.values())}
         except Exception as ex:
             self.log.error_processor(ex)
-            self.log.warning('email processing failed')
+            self.log.info('email processing failed')
         return organization_dict

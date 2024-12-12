@@ -45,14 +45,14 @@ class ApiProcessor(ProcessorServer):
             organization_dict[org_key] = self.org_structure(
                 inn, bik, r_account, tel
             )
-            self.log.info(f'Raw org data: {inn=} {bik=} {r_account=} {tel=}')
+
         return organization_dict
 
     def process_email_by_id(self, message_id: str) -> dict:
         if len(message_id) <= 1:
             return {}
         else:
-            self.log.warning(f'Starting {message_id} parsing')
+            self.log.info(f'Starting {message_id} parsing')
             message_ids = self.upd_index(message_id, last_letters=60)
             orgs_dict = {}
             if message_ids.get(message_id, 0) != 0:     # for message_id in list(message_ids.keys())[:20]:
@@ -60,15 +60,18 @@ class ApiProcessor(ProcessorServer):
                 try:
                     data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
                     attach_texts, message_text, _ = self.get_message_attributes(data)
-                    organization_dict = self.parse_attributes(attach_texts, message_text)
-                    organization = self.compose_organizations(organization_dict)
+                    organization_candidates = self.parse_attributes(attach_texts, message_text)
+                    organization = self.compose_organizations(organization_candidates)
+                    for k, v in organization_candidates.items():
+                        self.log.info(f'{k}:')
+                        self.log.info(f'{v}')
                     orgs_dict.update(organization)
                 except Exception as ex:
                     self.error_processor(ex)
                     self.log.error('Email processing failed')
                     return {}
-                self.log.warning('Parsing finished')
-            self.log.warning(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
+            self.log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
+            self.log.info('Parsing finished\n\n')
             self.clear_folders([f'{os.getcwd()}/temp/'])
             return orgs_dict
 
@@ -79,7 +82,6 @@ class ApiProcessor(ProcessorServer):
                and '*' not in v['r_account']
                and '*' not in v['bik']
         }
-        self.log.info(f'{organization}')
         return organization
 
     def get_index(self, mail_id) -> str:
@@ -96,10 +98,10 @@ class ApiProcessor(ProcessorServer):
         to_process_list = mail_ids
         for num, mail_id in enumerate(to_process_list):
             indx = self.get_index(mail_id)
-            self.log.warning(f'{num} - {mail_id} - {indx}')
+            self.log.info(f'{num} - {mail_id} - {indx}')
             if len(indx) > 0 and indx not in message_ids.keys():
                 message_ids[indx] = mail_id
-                self.log.warning(f'{indx} added')
+                self.log.info(f'{indx} added')
         with open(self.index_file, 'wb') as fp:
             pickle.dump(message_ids, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -113,7 +115,7 @@ class ApiProcessor(ProcessorServer):
         with open(self.index_file, 'rb') as fp:
             message_ids = pickle.load(fp)
         if message_id in message_ids.keys():
-            self.log.warning('Message-id found')
+            self.log.info('Message-id found')
             return message_ids
         self.dump_messages(mail_ids, message_ids,)
         return message_ids

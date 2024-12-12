@@ -91,7 +91,7 @@ class ProcessorServer(Processor):
                 orgs_dict.update(organization)
             except Exception as ex:
                 self.error_processor(ex)
-                self.log.warning('Email processing failed')
+                self.log.error('Email processing failed')
                 return {}
 
         return orgs_dict
