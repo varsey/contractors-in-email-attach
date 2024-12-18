@@ -18,4 +18,3 @@ pdf2image
 pillow
 pymorphy3
 lxml
-setuptools
