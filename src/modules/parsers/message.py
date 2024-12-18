@@ -14,8 +14,10 @@ log = Logger().log
 class MessageProcessor(EmailClient):
     def __init__(self, email: str, password: str, server: str, mail_folder: str):
         AttachmentParser.__init__(self)
+        # TO-DO remove email client from here
         EmailClient.__init__(self, email, password, server, mail_folder)
         self.parsers = TextParser()
+        # TO-DO move name to settings
         self.index_file = 'message_ids.pkl'
         self.mail_folder = mail_folder
 
@@ -56,7 +58,8 @@ class MessageProcessor(EmailClient):
             return {}
         else:
             log.info(f'Starting {message_id} parsing')
-            message_ids = self.upd_index(message_id, last_letters=260)
+            # TO-DO move last_letters to settings
+            message_ids = self.upd_index(message_id, last_letters=30)
             orgs_dict = {}
             if message_ids.get(message_id, 0) != 0:
             # for message_id in list(message_ids.keys())[:1000]:

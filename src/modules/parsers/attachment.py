@@ -4,6 +4,8 @@ import base64
 import traceback
 
 import PyPDF2
+# I wouldn't suggest using PyFPDF, as it is outdated and no longer being maintained.
+# Instead, you could use fpdf2 (see the documentation as well)
 import docx2txt
 import html2text
 from docx import Document
