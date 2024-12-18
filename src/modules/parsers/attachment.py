@@ -1,33 +1,36 @@
 import os
 import csv
 import base64
+import traceback
+
 import PyPDF2
 import docx2txt
 import html2text
-import traceback
-
 from docx import Document
 from docx.opc import exceptions
-from .Parsers import Parsers
-
 import pytesseract
 from pdf2image import convert_from_path
 from PIL import Image
 
+from src.logger.Logger import Logger
 
-class Processor:
-    def __init__(self, log):
+
+log = Logger().log
+
+
+class AttachmentParser:
+    def __init__(self):
         self.tmp_fldr = f'{os.getcwd()}/temp/'
+        os.makedirs(self.tmp_fldr, exist_ok=True)
         self.docx_ext = '.docx'
-        self.log = log
 
     def error_processor(self, ex: Exception) -> None:
         """Обработчик сообщений об ошибке"""
-        self.log.error("An exception of type {0} occurred. Arguments:\n{1!r}\n".format(type(ex).__name__, ex.args))
+        log.error("An exception of type {0} occurred. Arguments:\n{1!r}\n".format(type(ex).__name__, ex.args))
         if type(ex) == exceptions.PackageNotFoundError:
-            self.log.info('CANT PROCESS ATTACHMENT FILE')
+            log.info('CANT PROCESS ATTACHMENT FILE')
         else:
-            [self.log.info(f'{item}') for item in traceback.format_exception(type(ex), ex, ex.__traceback__)]
+            [log.info(f'{item}') for item in traceback.format_exception(type(ex), ex, ex.__traceback__)]
         return None
 
     @staticmethod
@@ -120,7 +123,7 @@ class Processor:
                     f.write(base64.b64decode(parsed_eml['attachment'][attach_count]['raw']))
                     f.close()
                     attach_names.append(attach_name)
-        self.log.info(f'Attachment list - {attach_names}')
+        log.info(f'Attachment list - {attach_names}')
         return attach_names
 
     def convert_attachment_file(self, attach_name: str):
@@ -156,30 +159,6 @@ class Processor:
             "ogrn": "",
             "okato": ""
         }
-
-    def parse_attributes(self, attach_texts: dict, message_text: str, header_from: str) -> dict:
-        organization_dict = {}
-        self.log.info(Parsers.clean_text(message_text))
-        for attach_name, full_text in attach_texts.items():
-            self.log.info(f'Processing attachment: {attach_name}')
-            card = Parsers.clean_text(full_text)  # full_text att_text
-            self.log.info(card) if card else self.log.info('No card found')
-
-            inn = Parsers.parse_inn(card.lower())
-            bik = Parsers.parse_bik(card)
-            corr_account = Parsers.parse_corr_account(card)
-            r_account = Parsers.parse_r_account(card)
-            email = Parsers.get_email(message_text, header_from)
-            first, last, middle = Parsers.get_name(message_text, header_from)
-            tel = Parsers.parse_tel(Parsers.clean_text(message_text))
-            address = Parsers.get_address(full_text)
-            website = Parsers.parse_website(message_text, email)
-
-            org_key = str(attach_name).split('/')[-1]
-            organization_dict[org_key] = self.org_structure(
-                inn, bik, r_account, corr_account, email, first, middle, last, tel, website, address
-            )
-        return organization_dict
 
     @staticmethod
     def parse_message_text(parsed_eml: dict):

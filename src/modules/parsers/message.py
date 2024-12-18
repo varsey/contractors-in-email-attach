@@ -1,18 +1,21 @@
 import os
 import shutil
 import pickle
-import logging
 from typing import Optional
-from src.ApiParsers import ApiParsers
-from common.Processor import Processor
-from common.ProcessorServer import ProcessorServer
+
+from src.logger.Logger import Logger
+from src.modules.parsers.text import TextParser
+from src.modules.parsers.attachment import AttachmentParser
+from src.modules.email.client import EmailClient
+
+log = Logger().log
 
 
-class ApiProcessor(ProcessorServer):
-    def __init__(self, email: str, password: str, server: str, mail_folder: str, log: logging):
-        Processor.__init__(self, log.log)
-        ProcessorServer.__init__(self, email, password, server, mail_folder, log)
-        self.parser = ApiParsers()
+class MessageProcessor(EmailClient):
+    def __init__(self, email: str, password: str, server: str, mail_folder: str):
+        AttachmentParser.__init__(self)
+        EmailClient.__init__(self, email, password, server, mail_folder)
+        self.parsers = TextParser()
         self.index_file = 'message_ids.pkl'
         self.mail_folder = mail_folder
 
@@ -28,18 +31,18 @@ class ApiProcessor(ProcessorServer):
     def parse_attributes(self, attach_texts: dict, message_text: str) -> dict:
         organization_dict = {}
         for attach_name, full_text in attach_texts.items():
-            self.log.info(f'Processing attachment: {attach_name}')
-            card = self.parser.clean_text(full_text)  # full_text att_text
+            log.info(f'Processing attachment: {attach_name}')
+            card = self.parsers.clean_text(full_text)  # full_text att_text
             if not card:
-                self.log.info('No card found')
+                log.info('No card found')
 
-            inn = self.parser.parse_inn(card.lower())
-            bik = self.parser.parse_bik(card)
-            r_account = self.parser.parse_r_account(card)
+            inn = self.parsers.parse_inn(card.lower())
+            bik = self.parsers.parse_bik(card)
+            r_account = self.parsers.parse_r_account(card)
 
-            tel = self.parser.parse_tel(self.parser.clean_text(message_text))
+            tel = self.parsers.parse_tel(self.parsers.clean_text(message_text))
             if len(tel) == 0:
-                tel = self.parser.parse_tel(card)
+                tel = self.parsers.parse_tel(card)
 
             org_key = str(attach_name).split('/')[-1]
             organization_dict[org_key] = self.org_structure(
@@ -52,10 +55,10 @@ class ApiProcessor(ProcessorServer):
         if len(message_id) <= 1:
             return {}
         else:
-            self.log.info(f'Starting {message_id} parsing')
-            message_ids = self.upd_index(message_id, last_letters=60)
+            log.info(f'Starting {message_id} parsing')
+            message_ids = self.upd_index(message_id, last_letters=260)
             orgs_dict = {}
-            if message_ids.get(message_id, 0) != 0:     # for message_id in list(message_ids.keys())[:20]:
+            if message_ids.get(message_id, 0) != 0:
             # for message_id in list(message_ids.keys())[:1000]:
                 try:
                     data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
@@ -63,15 +66,15 @@ class ApiProcessor(ProcessorServer):
                     organization_candidates = self.parse_attributes(attach_texts, message_text)
                     organization = self.compose_organizations(organization_candidates)
                     for k, v in organization_candidates.items():
-                        self.log.info(f'{k}:')
-                        self.log.info(f'{v}')
+                        log.info(f'{k}:')
+                        log.info(f'{v}')
                     orgs_dict.update(organization)
                 except Exception as ex:
                     self.error_processor(ex)
-                    self.log.error('Email processing failed')
+                    log.error('Email processing failed')
                     return {}
-            self.log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
-            self.log.info('Parsing finished\n\n')
+            log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
+            log.info('Parsing finished\n\n')
             self.clear_folders([f'{os.getcwd()}/temp/'])
             return orgs_dict
 
@@ -98,10 +101,10 @@ class ApiProcessor(ProcessorServer):
         to_process_list = mail_ids
         for num, mail_id in enumerate(to_process_list):
             indx = self.get_index(mail_id)
-            self.log.info(f'{num} - {mail_id} - {indx}')
+            log.info(f'{num} - {mail_id} - {indx}')
             if len(indx) > 0 and indx not in message_ids.keys():
                 message_ids[indx] = mail_id
-                self.log.info(f'{indx} added')
+                log.info(f'{indx} added')
         with open(self.index_file, 'wb') as fp:
             pickle.dump(message_ids, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -110,12 +113,12 @@ class ApiProcessor(ProcessorServer):
         last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
         if not os.path.exists(self.index_file):
-            logging.warning(f'No {self.index_file} file, creating one for {last_letters} last items')
+            log.warning(f'No {self.index_file} file, creating one for {last_letters} last items')
             self.dump_messages(mail_ids, message_ids={})
         with open(self.index_file, 'rb') as fp:
             message_ids = pickle.load(fp)
         if message_id in message_ids.keys():
-            self.log.info('Message-id found')
+            log.info('Message-id found')
             return message_ids
         self.dump_messages(mail_ids, message_ids,)
         return message_ids
@@ -130,5 +133,5 @@ class ApiProcessor(ProcessorServer):
                     elif os.path.isdir(file_path):
                         shutil.rmtree(file_path)
                 except Exception as e:
-                    self.log.error(f'Failed to delete {file_path}: {e}')
+                    log.error(f'Failed to delete {file_path}: {e}')
         return None
