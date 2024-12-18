@@ -1,14 +1,18 @@
 import os
 import imaplib
-import logging
-import eml_parser
 from typing import Optional
-from .Processor import Processor
+
+import eml_parser
+
+from src.logger.Logger import Logger
+from src.modules.parsers.attachment import AttachmentParser
+
+log = Logger().log
 
 
-class ProcessorServer(Processor):
-    def __init__(self, email: str, password: str, server: str, mail_folder: str, log: logging):
-        Processor.__init__(self, log.log)
+class EmailClient(AttachmentParser):
+    def __init__(self, email: str, password: str, server: str, mail_folder: str):
+        AttachmentParser.__init__(self)
         self.email = email
         self.password = password
         self.server = server
@@ -20,7 +24,7 @@ class ProcessorServer(Processor):
             self.mail_connector.login(self.email, self.password)
             self.sel = self.mail_connector.select(self.mail_folder) # mail_connector.list()[1] - list of folders in mailbox
         except Exception as e:
-            self.log.error(f'Cannot connect, check connection params {e}')
+            log.error(f'Cannot connect, check connection params {e}')
         return self.mail_connector
 
     def get_message_attributes(self, data) -> (dict, str, str):
@@ -37,7 +41,7 @@ class ProcessorServer(Processor):
             elif os.path.isfile(docx_file):
                 text = self.parse_docx(docx_file)
             else:
-                self.log.error('No files to process!')
+                log.error('No files to process!')
             return text
 
         ep = eml_parser.EmlParser(include_raw_body=True, include_attachment_data=True)
@@ -54,7 +58,7 @@ class ProcessorServer(Processor):
                         full_text = _parsing_wrapper(attachment_path)
                         attach_texts[attach_name] = full_text
                     except Exception as ex:
-                        self.log.error(f'{ex}')
+                        log.error(f'{ex}')
                         self.error_processor(ex)
                         continue
 
@@ -74,10 +78,10 @@ class ProcessorServer(Processor):
     def process_email(self, mail_folder: str, msg_id: Optional[str], start_point: int = 0) -> dict:
         """Email message from gmail"""
         if msg_id is not None:
-            self.log.info(f'With with a single id {msg_id}')
+            log.info(f'With with a single id {msg_id}')
             to_process_list = [msg_id]
         else:
-            self.log.info(f'With with last {abs(start_point)} ids')
+            log.info(f'With with last {abs(start_point)} ids')
             mail_ids = self.get_mail_ids(mail_folder)
             to_process_list = mail_ids[start_point:]
         orgs_dict = {}
@@ -85,13 +89,13 @@ class ProcessorServer(Processor):
             try:
                 data = self.see_msg(self.mail_connector, mail_id)
                 attach_texts, message_text, header_from = self.get_message_attributes(data)
-                organization_dict = self.parse_attributes(attach_texts, message_text, header_from)
+                organization_dict = self.c(attach_texts, message_text, header_from)
                 # filter if any field has * - doubts on correctness
                 organization = {k: v for k, v in organization_dict.items() if '*' not in ''.join(v.values())}
                 orgs_dict.update(organization)
             except Exception as ex:
                 self.error_processor(ex)
-                self.log.error('Email processing failed')
+                log.error('Email processing failed')
                 return {}
 
         return orgs_dict
@@ -108,7 +112,7 @@ class ProcessorServer(Processor):
                     email_date = parsed_eml['header']['header']['date'][0]
                     dates.append(email_date.split()[1])
                     day_names.append(email_date.split(',')[0])
-        self.log.info(f'dates - {dates}, day names - {day_names}')
+        log.info(f'dates - {dates}, day names - {day_names}')
         if len(set(dates)) > 1 and (day_names[0] in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']):
             return True
         return False
