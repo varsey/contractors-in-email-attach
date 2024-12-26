@@ -28,8 +28,10 @@ class ApiProcessor(ProcessorServer):
         for mess_part in [f'инн{x}' for x in self.parser.clean_text(message_text).split('инн')]:
             inn = self.parser.parse_inn(mess_part)
             inns.append(inn)
+        organization_dict['message'] = self.org_structure(inns)
 
         for attach_name, full_text in attach_texts.items():
+            inns = []
             self.log.info(f'Processing attachment: {attach_name}')
             card = self.parser.clean_text(full_text)  # full_text att_text
             if not card:
@@ -41,7 +43,6 @@ class ApiProcessor(ProcessorServer):
 
             org_key = str(attach_name).split('/')[-1]
             organization_dict[org_key] = self.org_structure(inns)
-            inns = []
 
         return organization_dict
 
@@ -50,7 +51,7 @@ class ApiProcessor(ProcessorServer):
             return {}
         else:
             self.log.info(f'Starting {message_id} parsing')
-            message_ids = self.upd_index(message_id, last_letters=60)
+            message_ids = self.upd_index(message_id, last_letters=260)
             orgs_dict = {}
             if message_ids.get(message_id, 0) != 0:     # for message_id in list(message_ids.keys())[:20]:
             # for message_id in list(message_ids.keys())[:1000]:
