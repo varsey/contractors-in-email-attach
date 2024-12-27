@@ -94,7 +94,7 @@ class AttachmentParser:
 
             image_file_list = []
             for page_enumeration, page in enumerate(pdf_pages, start=1):
-                filename = f"{self.tmp_fldr}\page_{page_enumeration:04}.jpg"
+                filename = f"{self.tmp_fldr}/page_{page_enumeration:04}.jpg"
                 page.save(filename, "JPEG")
                 image_file_list.append(filename)
 

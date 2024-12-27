@@ -22,36 +22,36 @@ class MessageProcessor(EmailClient):
         self.mail_folder = mail_folder
 
     @staticmethod
-    def org_structure(inn, bik, r_account, tel):
+    def org_structure(inns):
         return {
-            'inn': [inn if len(inn) == 10 or len(inn) == 12 else inn + '*'][0],
-            'bik': [bik if len(bik) == 9 else bik + '*'][0],
-            'r_account': [r_account if len(r_account) == 20 else r_account + '*'][0],
-            "phone": tel,
+            'inn': [inn if len(inn) in (10, 12) else inn + '*' for inn in inns if len(inn + '*') > 9],
         }
+
 
     def parse_attributes(self, attach_texts: dict, message_text: str) -> dict:
         organization_dict = {}
+        inns = []
+        for mess_part in [f'инн{x}' for x in self.parsers.clean_text(message_text).split('инн')]:
+            inn = self.parsers.parse_inn(mess_part)
+            inns.append(inn)
+        organization_dict['message'] = self.org_structure(inns)
+
         for attach_name, full_text in attach_texts.items():
+            inns = []
             log.info(f'Processing attachment: {attach_name}')
             card = self.parsers.clean_text(full_text)  # full_text att_text
             if not card:
                 log.info('No card found')
 
-            inn = self.parsers.parse_inn(card.lower())
-            bik = self.parsers.parse_bik(card)
-            r_account = self.parsers.parse_r_account(card)
-
-            tel = self.parsers.parse_tel(self.parsers.clean_text(message_text))
-            if len(tel) == 0:
-                tel = self.parsers.parse_tel(card)
+            for card_part in card.lower().split('инн'):
+                inn = self.parsers.parse_inn(card_part)
+                inns.append(inn)
 
             org_key = str(attach_name).split('/')[-1]
-            organization_dict[org_key] = self.org_structure(
-                inn, bik, r_account, tel
-            )
+            organization_dict[org_key] = self.org_structure(inns)
 
         return organization_dict
+
 
     def process_email_by_id(self, message_id: str) -> dict:
         if len(message_id) <= 1:
@@ -82,13 +82,7 @@ class MessageProcessor(EmailClient):
             return orgs_dict
 
     def compose_organizations(self, organization_dict: dict) -> dict:
-        organization = {
-            k: v for k, v in organization_dict.items()
-            if '*' not in v['inn']
-               and '*' not in v['r_account']
-               and '*' not in v['bik']
-        }
-        return organization
+        return {k: v for k, v in organization_dict.items()}
 
     def get_index(self, mail_id) -> str:
         try:
