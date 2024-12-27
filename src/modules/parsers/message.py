@@ -82,7 +82,8 @@ class MessageProcessor(EmailClient):
             log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
             log.info('Parsing finished\n\n')
             self.clear_folders([f'{os.getcwd()}/temp/'])
-            return orgs_dict
+            inns = [x['inn'] for x in orgs_dict.values()]
+            return {'inns': list(set([x for xs in inns for x in xs]))}
 
     def compose_organizations(self, organization_dict: dict) -> dict:
         return {k: v for k, v in organization_dict.items()}
