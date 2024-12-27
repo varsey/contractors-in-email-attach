@@ -27,5 +27,4 @@ def contractor_parser_parameter():
 
 
 if __name__ == "__main__":
-    # TO-DO remove debug flag
-    app.run(debug=True, host='0.0.0.0', port=8000)
+    app.run(debug=False, host='0.0.0.0', port=8000)

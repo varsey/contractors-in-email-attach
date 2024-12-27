@@ -45,8 +45,8 @@ class EmailClient(AttachmentParser):
             return text
 
         ep = eml_parser.EmlParser(include_raw_body=True, include_attachment_data=True)
-        _, message_text, _, attach_name, header_from = '', '', '', '', ''
-        attach_names, _, attach_texts = [], [], {}
+        message_text, attach_name, header_from = '', '', ''
+        attach_names, attach_texts = [], {}
         for response_part in data:
             if isinstance(response_part, tuple):
                 parsed_eml = ep.decode_email_bytes(response_part[1])

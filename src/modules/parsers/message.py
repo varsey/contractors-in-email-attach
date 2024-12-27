@@ -7,6 +7,7 @@ from src.logger.Logger import Logger
 from src.modules.parsers.text import TextParser
 from src.modules.parsers.attachment import AttachmentParser
 from src.modules.email.client import EmailClient
+from src.modules.alerter.alerter import send_email_alert
 
 log = Logger().log
 
@@ -65,8 +66,10 @@ class MessageProcessor(EmailClient):
             # for message_id in list(message_ids.keys())[:1000]:
                 try:
                     data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
-                    attach_texts, message_text, _ = self.get_message_attributes(data)
+                    attach_texts, message_text, header_from = self.get_message_attributes(data)
                     organization_candidates = self.parse_attributes(attach_texts, message_text)
+                    if any([x for x in organization_candidates.values() if '*' in str(x['inn'])]):
+                        send_email_alert(header_from)
                     organization = self.compose_organizations(organization_candidates)
                     for k, v in organization_candidates.items():
                         log.info(f'{k}:')
