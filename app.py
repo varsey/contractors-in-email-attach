@@ -1,22 +1,14 @@
 import gc
-import os
 import logging
 
 from flask import Flask, jsonify, request
 
-from common.Logger import Logger
-from src.ApiProcessor import ApiProcessor
-
+from src.modules.parsers.message import MessageProcessor
+from src.config.cfg import Config
 
 app = Flask(__name__)
-
-mail_folder = 'inbox'
-email, password, server = os.getenv("EMAIL"), os.getenv('PASS'), os.getenv('SERVER')
-if any(v is None for v in [email, password, server]):
-    raise ValueError("One of the EMAIL, PASS, SERVER parameter is not set")
-
-logger = Logger()
-prc = ApiProcessor(email, password, server, mail_folder, logger)
+cfg = Config()
+prc = MessageProcessor(**cfg.creds)
 
 logging.getLogger('pymorphy2.opencorpora_dict.wrapper').setLevel(logging.ERROR)
 
@@ -35,4 +27,4 @@ def contractor_parser_parameter():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=8000)
+    app.run(debug=False, host='0.0.0.0', port=8000)
