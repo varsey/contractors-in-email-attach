@@ -9,7 +9,6 @@ RUN echo 'APT::Keep-Downloaded-Packages "false";' > /etc/apt/apt.conf.d/01disabl
     apt-get clean
 COPY ./build/requirements.txt .
 RUN pip install --no-cache-dir --prefer-binary --upgrade -r requirements.txt
-COPY . .
 
 WORKDIR /app
 RUN sed -i 's/env //' /usr/bin/unoconv
