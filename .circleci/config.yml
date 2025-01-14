@@ -7,7 +7,7 @@ orbs:
 executors:
   python-executor:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.12
     working_directory: ~/my-python-app
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
           name: Build Docker Image
           command: |
             echo "Building Docker image..."
-            docker build -t my-python-app .
+            docker build -t api-contactor-parser -f ./build/Dockerfile .
 
   test:
     executor: python-executor
