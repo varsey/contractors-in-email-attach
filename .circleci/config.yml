@@ -14,14 +14,6 @@ jobs:
             echo "Building Docker image..."
             docker build -t api-contactor-parser -f ./build/Dockerfile .
 
-  test:
-    steps:
-      - checkout
-      - run:
-          name: Run Tests
-          command: |
-            echo "This is a placeholder for tests. No actual tests are being run."
-
 workflows:
   build-and-test:
     jobs:
