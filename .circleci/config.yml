@@ -3,6 +3,13 @@
 version: 2.1
 orbs:
   python: circleci/python@2
+
+executors:
+  python-executor:
+    docker:
+      - image: circleci/python:3.8
+    working_directory: ~/my-python-app
+
 jobs:
   build:
     executor: python-executor
