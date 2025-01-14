@@ -116,10 +116,13 @@ class AttachmentParser:
     def save_attachments_files(self, parsed_eml) -> list:
         os.makedirs(self.tmp_fldr, exist_ok=True)
         attach_names = []
-        if 'attachment' in parsed_eml.keys() and len(parsed_eml['attachment']) > 0:
-            for attach_count in range(len(parsed_eml['attachment'])):
+        log.info(parsed_eml['subject'])
+        log.info(parsed_eml['from'])
+        num_attachments = len(parsed_eml['attachment']) if 'attachment' in parsed_eml.keys() else 0
+        if num_attachments > 0:
+            for attach_count in range(num_attachments):
                 attach_name = parsed_eml['attachment'][attach_count]['filename']
-                attach_name = attach_name.replace('.', '')[:40] + "." + attach_name.split(".")[-1].lower()
+                attach_name = f'{attach_name.replace(".", "")[:40]}.{attach_name.split(".")[-1].lower()}'
                 if self.attach_extention_check(attach_name) and self.attach_name_check(attach_name):
                     f = open(f'{self.tmp_fldr}/{attach_name}', 'wb+')
                     f.write(base64.b64decode(parsed_eml['attachment'][attach_count]['raw']))
