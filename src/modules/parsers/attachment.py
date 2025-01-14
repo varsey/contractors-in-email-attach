@@ -49,7 +49,7 @@ class AttachmentParser:
         try:
             document = Document(''.join(attachment_path.split('.')[:-1]) + self.docx_ext)
         except KeyError:
-            document = None
+            return ''
 
         full_text = ''
         if document is not None and len(document.tables) > 0:
@@ -69,6 +69,7 @@ class AttachmentParser:
             for x in docx2txt.process(''.join(attachment_path.split('.')[:-1]) + self.docx_ext).split():
                 if x not in extracted_list:
                     extracted_list.append(x)
+
             return ' '.join(extracted_list)
 
         return full_text
@@ -114,10 +115,10 @@ class AttachmentParser:
         return full_text
 
     def save_attachments_files(self, parsed_eml) -> list:
-        os.makedirs(self.tmp_fldr, exist_ok=True)
-        attach_names = []
         log.info(parsed_eml['subject'])
         log.info(parsed_eml['from'])
+
+        attach_names = []
         num_attachments = len(parsed_eml['attachment']) if 'attachment' in parsed_eml.keys() else 0
         if num_attachments > 0:
             for attach_count in range(num_attachments):
@@ -129,10 +130,10 @@ class AttachmentParser:
                     f.close()
                     attach_names.append(attach_name)
         log.info(f'Attachment list - {attach_names}')
+
         return attach_names
 
     def convert_attachment_file(self, attach_name: str):
-        os.makedirs(self.tmp_fldr, exist_ok=True)
         cmd = ''
         attachment_path = f'{self.tmp_fldr}{attach_name}'
         if attach_name.split('.')[-1] == 'doc':
@@ -149,7 +150,7 @@ class AttachmentParser:
     def org_structure(inn, bik, r_account, corr_account, email, first, middle, last, tel, website, address):
         return {
             'inn': [inn if len(inn) == 10 or len(inn) == 12 else inn + '*'][0],
-            'bik': [bik if len(bik) == 9 and bik[:2] == '04' else bik + '*'][0],
+            'bik': [bik if len(bik) == 9 and bik.startswith('04') else bik + '*'][0],
             'r_account': [r_account if len(r_account) == 20 else r_account + '*'][0],
             'c_account': [corr_account if len(corr_account) == 20 else corr_account + '*'][0],
             'email': email,
