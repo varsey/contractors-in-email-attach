@@ -7,7 +7,7 @@ orbs:
 executors:
   python-executor:
     docker:
-      - image: cimg/python:3.12
+      - image: cimg/python:3.12-browsers
     working_directory: ~/my-python-app
 
 jobs:
