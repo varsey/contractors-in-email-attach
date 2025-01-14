@@ -119,7 +119,7 @@ class AttachmentParser:
         if 'attachment' in parsed_eml.keys() and len(parsed_eml['attachment']) > 0:
             for attach_count in range(len(parsed_eml['attachment'])):
                 attach_name = parsed_eml['attachment'][attach_count]['filename']
-                attach_name = attach_name.replace('.', '')[:40] + "." + attach_name.split(".")[-1]
+                attach_name = attach_name.replace('.', '')[:40] + "." + attach_name.split(".")[-1].lower()
                 if self.attach_extention_check(attach_name) and self.attach_name_check(attach_name):
                     f = open(f'{self.tmp_fldr}/{attach_name}', 'wb+')
                     f.write(base64.b64decode(parsed_eml['attachment'][attach_count]['raw']))
