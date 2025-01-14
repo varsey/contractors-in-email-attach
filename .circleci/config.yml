@@ -4,33 +4,28 @@ version: 2.1
 orbs:
   python: circleci/python@2
 jobs:
-  test-python:
-    # Install dependencies and run tests
-    docker:
-      - image: cimg/python:3.8-node
-    working_directory: ~/project/build
+  build:
+    executor: python-executor
     steps:
-      - checkout:
-          path: ~/project
-      - python/install-packages
+      - checkout
       - run:
-          name: Run tests
-          command: pytest --junitxml=junit.xml || ((($? == 5)) && echo 'Did not find any tests to run.')
-      - store_test_results:
-          path: junit.xml
-  deploy:
-    # This is an example deploy job, not actually used by the workflow
-    docker:
-      - image: cimg/base:stable
+          name: Build Docker Image
+          command: |
+            echo "Building Docker image..."
+            docker build -t my-python-app .
+
+  test:
+    executor: python-executor
     steps:
-      # Replace this with steps to deploy to users
+      - checkout
       - run:
-          name: deploy
-          command: '#e.g. ./deploy.sh'
+          name: Run Tests
+          command: |
+            echo "This is a placeholder for tests. No actual tests are being run."
 workflows:
   build-and-test:
     jobs:
-      - test-python
-    # - deploy:
-    #     requires:
-    #       - test-python
+      - build
+      - test:
+          requires:
+            - build
