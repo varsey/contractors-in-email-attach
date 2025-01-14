@@ -1,20 +1,15 @@
 # This config was automatically generated from your source code
 # Stacks detected: deps:python:build
 version: 2.1
-orbs:
-  python: circleci/python@2
-
-executors:
-  python-executor:
-    docker:
-      - image: cimg/base:current
-    working_directory: ~/app
-
 jobs:
   build:
-    executor: python-executor
+    working_directory: ~/app
+    docker:
+      - image: cimg/base:current
     steps:
       - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
       - run:
           name: Build Docker Image
           command: |
