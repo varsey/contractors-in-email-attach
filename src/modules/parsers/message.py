@@ -60,7 +60,8 @@ class MessageProcessor(EmailClient):
         else:
             log.info(f'Starting {message_id} parsing')
             # TO-DO move last_letters to settings
-            message_ids = self.upd_index(message_id, last_letters=60)
+            # TO-DO move last_letters to settings
+            message_ids = self.upd_index(message_id, last_letters=20)
             orgs_dict = {}
             if message_ids.get(message_id, 0) != 0:
             # for message_id in list(message_ids.keys())[:1000]:
