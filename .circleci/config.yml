@@ -1,5 +1,3 @@
-# This config was automatically generated from your source code
-# Stacks detected: deps:python:build
 version: 2.1
 jobs:
   build:
@@ -17,13 +15,13 @@ jobs:
             docker build -t api-contactor-parser -f ./build/Dockerfile .
 
   test:
-    executor: python-executor
     steps:
       - checkout
       - run:
           name: Run Tests
           command: |
             echo "This is a placeholder for tests. No actual tests are being run."
+
 workflows:
   build-and-test:
     jobs:
