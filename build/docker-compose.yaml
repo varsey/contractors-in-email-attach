@@ -1,5 +1,5 @@
 services:
-    dev:
+    contractor-extractor:
         deploy:
           resources:
             limits:
@@ -20,7 +20,7 @@ services:
         container_name: api-contactor-parser-latest
         volumes:
             - .././:/app
-        restart: always
+        restart: unless-stopped
         ports:
           - "8000:8000"
         command: gunicorn -w 1 --bind 0.0.0.0:8000 --timeout 1200 app:app
