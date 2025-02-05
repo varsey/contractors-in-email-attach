@@ -27,4 +27,5 @@ jobs:
 workflows:
   build-and-test:
     jobs:
-      - build
+      - build:
+          context: common-context
