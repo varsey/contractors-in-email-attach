@@ -17,7 +17,6 @@ services:
           context: ..
           dockerfile: build/Dockerfile
         image: api-contactor-parser:latest
-        container_name: api-contactor-parser-latest
         volumes:
             - .././:/app
         restart: unless-stopped
