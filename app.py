@@ -25,6 +25,13 @@ def contractor_parser_parameter():
     gc.collect()
     return jsonify(card)
 
+@app.route("/sample/")
+def parse_random():
+    card = prc.process_random_id()
+    gc.collect()
+    return jsonify(card)
+
+
 
 if __name__ == "__main__":
-    app.run(debug=False, host='0.0.0.0', port=8000)
+    app.run(debug=True, host='0.0.0.0', port=8000)
