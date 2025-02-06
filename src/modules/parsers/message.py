@@ -1,15 +1,25 @@
 import os
+import json
+import random
 import shutil
 import pickle
 from typing import Optional
+
+import requests
 
 from src.logger.Logger import Logger
 from src.modules.parsers.text import TextParser
 from src.modules.parsers.attachment import AttachmentParser
 from src.modules.email.client import EmailClient
 from src.modules.alerter.alerter import send_email_alert
+from src.modules.generator.pdf import generate_pdf
+from src.modules.minio.client import MinioClient
 
 log = Logger().log
+
+s3 = MinioClient()
+
+URL = "http://158.160.98.2:8000/parse_pdf"
 
 
 def compose_organizations(organization_dict: dict) -> dict:
@@ -146,3 +156,39 @@ class MessageProcessor(EmailClient):
             message_ids = pickle.load(fp)
 
         return message_ids
+
+    def process_random_id(self) -> dict:
+            message_ids = self.upd_index(None, last_letters=50)
+            message_id = random.choice(list(message_ids.keys())[:50])
+            if message_ids.get(message_id, 0) != 0:
+                try:
+                    data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
+                    attach_texts, message_text, _ = self.get_message_attributes(data)
+                except Exception as ex:
+                    self.error_processor(ex)
+                    log.error('Email processing failed')
+                    return {}
+            log.info('Parsing finished\n\n')
+            clear_folders([f'{os.getcwd()}/temp/'])
+
+            names = []
+            names.extend(generate_pdf({'mail': message_text}))
+            names.extend(generate_pdf(attach_texts))
+            print(names)
+            for name in names:
+                print('uploading', f'{os.getcwd()}/{name}')
+                s3.upload_file(f'{os.getcwd()}/{name}')
+
+            data = {
+                "urls": [f"https://storage.yandexcloud.net/varsey-backet/mails/{file}" for file in names if 'карт' in file or 'mail' in file]
+            }
+            print(data, '***')
+            response = requests.post(URL, headers={"Content-Type": "application/json"}, data=json.dumps(data))
+
+            if response.status_code == 200:
+                print("Response JSON:", response.json())
+            else:
+                print("Error:", response.status_code, response.text)
+
+            log.info('Processing successful')
+            return {'attach': attach_texts, 'mail': message_text}
