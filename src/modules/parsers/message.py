@@ -104,7 +104,7 @@ class MessageProcessor(EmailClient):
             log.info('Parsing finished\n\n')
             clear_folders([f'{os.getcwd()}/temp/'])
             inns = [x['inn'] for x in orgs_dict.values()]
-            return {'inns': list(set([x for xs in inns for x in xs]))}
+            return {'inns': list(set([x for xs in inns for x in xs if '*' not in x]))}
 
     def get_index(self, mail_id) -> str:
         try:
