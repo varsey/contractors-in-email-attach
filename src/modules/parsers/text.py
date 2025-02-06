@@ -31,12 +31,13 @@ class TextParser:
                 if 'банк' in card.split(inn)[0][-110:]:
                     inn = ''
 
-        if len(inn) == 0 and 'инн' in card.lower():
-            for card_part in card.split('инн', maxsplit=card.count('инн')):
-                part = card_part.lower().split('инн')[-1]
-                inn_candidate = [x for x in part.split(' ') if len(x) > 0 and not x[0].isalpha()]
-                if len(inn_candidate) >= 1 and 'банк' not in card.split(inn_candidate[0])[0][-110:]:
-                    inn = inn_candidate[0]
+        for marker in ('инн', 'идентификационный номер'):
+            if len(inn) == 0 and marker in card.lower():
+                for card_part in card.split(marker, maxsplit=card.count('инн')):
+                    part = card_part.lower().split(marker)[-1]
+                    inn_candidate = [x for x in part.split(' ') if len(x) > 0 and not x[0].isalpha()]
+                    if len(inn_candidate) >= 1 and 'банк' not in card.split(inn_candidate[0])[0][-110:]:
+                        inn = inn_candidate[0]
 
         if len(inn) not in (12, 10):
             cadidates = [x for x in card.split()]
