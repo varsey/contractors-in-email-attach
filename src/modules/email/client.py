@@ -1,6 +1,5 @@
 import os
 import imaplib
-from typing import Optional
 
 import eml_parser
 
@@ -74,61 +73,3 @@ class EmailClient(AttachmentParser):
             mail_ids += block.split()
         print(len(mail_ids))
         return mail_ids
-
-    def process_email(self, mail_folder: str, msg_id: Optional[str], start_point: int = 0) -> dict:
-        """Email message from gmail"""
-        if msg_id is not None:
-            log.info(f'With with a single id {msg_id}')
-            to_process_list = [msg_id]
-        else:
-            log.info(f'With with last {abs(start_point)} ids')
-            mail_ids = self.get_mail_ids(mail_folder)
-            to_process_list = mail_ids[start_point:]
-        orgs_dict = {}
-        for mail_id in to_process_list:
-            try:
-                data = self.see_msg(self.mail_connector, mail_id)
-                attach_texts, message_text, header_from = self.get_message_attributes(data)
-                organization_dict = self.c(attach_texts, message_text, header_from)
-                # filter if any field has * - doubts on correctness
-                organization = {k: v for k, v in organization_dict.items() if '*' not in ''.join(v.values())}
-                orgs_dict.update(organization)
-            except Exception as ex:
-                self.error_processor(ex)
-                log.error('Email processing failed')
-                return {}
-
-        return orgs_dict
-
-    def is_next_day(self, start_point: int = 2) -> bool:
-        mail_ids = self.get_mail_ids('(SEEN)')
-        dates, day_names = [], []
-        for mail_id in mail_ids[-start_point:]:
-            data = self.see_msg(self.mail_connector, mail_id)
-            ep = eml_parser.EmlParser(include_raw_body=True, include_attachment_data=True)
-            for response_part in data:
-                if isinstance(response_part, tuple):
-                    parsed_eml = ep.decode_email_bytes(response_part[1])
-                    email_date = parsed_eml['header']['header']['date'][0]
-                    dates.append(email_date.split()[1])
-                    day_names.append(email_date.split(',')[0])
-        log.info(f'dates - {dates}, day names - {day_names}')
-        if len(set(dates)) > 1 and (day_names[0] in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']):
-            return True
-        return False
-
-    def get_messages_for_ml(self, start_point: int = 90) -> list:
-        messages = []
-        mail_ids = self.get_mail_ids('(SEEN)')
-        for mail_id in mail_ids[-start_point:]:
-            data = self.see_msg(self.mail_connector, mail_id, '(BODY.PEEK[])')
-            ep = eml_parser.EmlParser(include_raw_body=True, include_attachment_data=True)
-            message_text = ''
-            for response_part in data:
-                if isinstance(response_part, tuple):
-                    parsed_eml = ep.decode_email_bytes(response_part[1])
-                    if len(parsed_eml['body']) > 0:
-                        message_text = self.parse_message_text(parsed_eml)
-            messages.append(message_text)
-
-        return messages
