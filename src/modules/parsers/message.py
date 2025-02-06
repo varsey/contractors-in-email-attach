@@ -12,6 +12,24 @@ from src.modules.alerter.alerter import send_email_alert
 log = Logger().log
 
 
+def compose_organizations(organization_dict: dict) -> dict:
+    return {k: v for k, v in organization_dict.items()}
+
+
+def clear_folders(folder_paths: list):
+    for folder_path in folder_paths:
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                log.error(f'Failed to delete {file_path}: {e}')
+    return None
+
+
 class MessageProcessor(EmailClient):
     def __init__(self, email: str, password: str, server: str, mail_folder: str):
         AttachmentParser.__init__(self)
@@ -60,7 +78,6 @@ class MessageProcessor(EmailClient):
         else:
             log.info(f'Starting {message_id} parsing')
             # TO-DO move last_letters to settings
-            # TO-DO move last_letters to settings
             message_ids = self.upd_index(message_id, last_letters=20)
             orgs_dict = {}
             if message_ids.get(message_id, 0) != 0:
@@ -69,12 +86,15 @@ class MessageProcessor(EmailClient):
                     data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
                     attach_texts, message_text, header_from = self.get_message_attributes(data)
                     organization_candidates = self.parse_attributes(attach_texts, message_text)
-                    if any([x for x in organization_candidates.values() if '*' in str(x['inn'])]):
+                    if (
+                        len(organization_candidates.values()) == 1
+                        and
+                        '*' in str(organization_candidates.values())
+                    ):
                         send_email_alert(header_from)
-                    organization = self.compose_organizations(organization_candidates)
+                    organization = compose_organizations(organization_candidates)
                     for k, v in organization_candidates.items():
-                        log.info(f'{k}:')
-                        log.info(f'{v}')
+                        log.info(f'\n{k}:\n{v}')
                     orgs_dict.update(organization)
                 except Exception as ex:
                     self.error_processor(ex)
@@ -82,12 +102,9 @@ class MessageProcessor(EmailClient):
                     return {}
             log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
             log.info('Parsing finished\n\n')
-            self.clear_folders([f'{os.getcwd()}/temp/'])
+            clear_folders([f'{os.getcwd()}/temp/'])
             inns = [x['inn'] for x in orgs_dict.values()]
             return {'inns': list(set([x for xs in inns for x in xs]))}
-
-    def compose_organizations(self, organization_dict: dict) -> dict:
-        return {k: v for k, v in organization_dict.items()}
 
     def get_index(self, mail_id) -> str:
         try:
@@ -100,13 +117,12 @@ class MessageProcessor(EmailClient):
         return idx
 
     def dump_messages(self, mail_ids, message_ids):
-        to_process_list = mail_ids
-        for num, mail_id in enumerate(to_process_list):
-            indx = self.get_index(mail_id)
-            log.info(f'{num} - {mail_id} - {indx}')
-            if len(indx) > 0 and indx not in message_ids.keys():
-                message_ids[indx] = mail_id
-                log.info(f'{indx} added')
+        log.info('Dumping messages, please wait...')
+        for num, mail_id in enumerate(mail_ids):
+            if mail_id not in message_ids.values():
+                indx = self.get_index(mail_id)
+                if len(indx) > 0 and indx not in message_ids.keys():
+                    message_ids[indx] = mail_id
         with open(self.index_file, 'wb') as fp:
             pickle.dump(message_ids, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -122,18 +138,11 @@ class MessageProcessor(EmailClient):
         if message_id in message_ids.keys():
             log.info('Message-id found')
             return message_ids
-        self.dump_messages(mail_ids, message_ids,)
-        return message_ids
+        else:
+            log.warning('Message-id not found')
 
-    def clear_folders(self, folder_paths: list):
-        for folder_path in folder_paths:
-            for filename in os.listdir(folder_path):
-                file_path = os.path.join(folder_path, filename)
-                try:
-                    if os.path.isfile(file_path) or os.path.islink(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    log.error(f'Failed to delete {file_path}: {e}')
-        return None
+        self.dump_messages(mail_ids, message_ids)
+        with open(self.index_file, 'rb') as fp:
+            message_ids = pickle.load(fp)
+
+        return message_ids
