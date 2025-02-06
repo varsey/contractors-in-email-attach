@@ -115,8 +115,8 @@ class AttachmentParser:
         return full_text
 
     def save_attachments_files(self, parsed_eml) -> list:
-        log.info(parsed_eml['subject'])
-        log.info(parsed_eml['from'])
+        log.info(parsed_eml['header']['subject'])
+        log.info(parsed_eml['header']['from'])
 
         attach_names = []
         num_attachments = len(parsed_eml['attachment']) if 'attachment' in parsed_eml.keys() else 0
