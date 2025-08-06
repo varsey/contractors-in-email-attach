@@ -26,6 +26,14 @@ class EmailClient(AttachmentParser):
             log.error(f'Cannot connect, check connection params {e}')
         return self.mail_connector
 
+    def teardown_mail_connector(self):
+        try:
+            self.mail_connector.close()
+            self.mail_connector.logout()
+        except Exception as e:
+            log.error(f'Cannot close imap connection: {e}')
+        return None
+
     def get_message_attributes(self, data) -> (dict, str, str):
 
         def _parsing_wrapper(attach_path):
