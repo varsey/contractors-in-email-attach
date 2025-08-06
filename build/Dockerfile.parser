@@ -5,7 +5,7 @@ RUN echo 'APT::Keep-Downloaded-Packages "false";' > /etc/apt/apt.conf.d/01disabl
     apt update &&  \
     apt install -y default-jre libleptonica-dev libreoffice-java-common libreoffice-writer  \
     libtesseract-dev poppler-utils python3-pil tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus  \
-    tesseract-ocr-script-latn unoconv &&  \
+    tesseract-ocr-script-latn unoconv curl &&  \
     apt-get clean
 COPY ./build/requirements.txt .
 RUN pip install --no-cache-dir --prefer-binary --upgrade -r requirements.txt
