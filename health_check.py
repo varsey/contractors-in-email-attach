@@ -1,31 +1,47 @@
 import os
 import time
+import random
 import smtplib
 import requests
+import logging
+from logging.handlers import RotatingFileHandler
 from email.mime.text import MIMEText
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger('health_checker')
+logger.setLevel(logging.INFO)
 
-SERVER_URL = 'http://0.0.0.0:8000'
-CHECK_INTERVAL = 10
+# Create rotating file handler, 10MB = 10 * 1024 * 1024 bytes
+file_handler = RotatingFileHandler('health.logs', maxBytes=10*1024*1024, backupCount=30)
+file_handler.setLevel(logging.INFO)
 
-SMTP_SERVER = 'smtp.yandex.ru'
+# Create formatter and add it to the handler
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add handler to logger
+logger.addHandler(file_handler)
+
+SERVER_URL = os.getenv("SERVER_URL")
+CHECK_INTERVAL = random.choice(range(30, 120))
+
+SMTP_SERVER = os.getenv("SMTP_SERVER")
 SMTP_PORT = 587
 SMTP_USERNAME = os.getenv("SMTP_USERNAME")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 TO_EMAIL = os.getenv("TO_EMAIL")
 
 if any(v is None for v in [SMTP_USERNAME, SMTP_PASSWORD, TO_EMAIL]):
+    logger.error("One of the SMTP_USERNAME, SMTP_PASSWORD, TO_EMAIL parameter is not set")
     raise ValueError("One of the SMTP_USERNAME, SMTP_PASSWORD, TO_EMAIL parameter is not set")
 
 
-def send_email_alert():
-    print(f'Sending email alert to {TO_EMAIL}')
+def send_email_alert(body: str):
+    logger.info(f'Sending email alert to {TO_EMAIL}')
     subject = 'Flask Server Down Alert'
-    body = f'The Flask server at {SERVER_URL} is not reachable.'
 
     msg = MIMEText(body)
     msg['Subject'] = subject
@@ -37,25 +53,26 @@ def send_email_alert():
             server.starttls()
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.sendmail(SMTP_USERNAME, TO_EMAIL.split(','), msg.as_string())
-        print(f'Alert email sent to {TO_EMAIL}')
+        logger.info(f'Alert email sent to {TO_EMAIL}')
     except Exception as e:
-        print(f'Failed to send email: {e}')
+        logger.error(f'Failed to send email: {e}')
 
 
 def check_server():
     try:
-        response = requests.get(SERVER_URL, timeout=30)
+        response = requests.get(SERVER_URL, timeout=55)
         if response.status_code != 200:
-            print(f'Server is down! Status code: {response.status_code}')
-            send_email_alert()
+            logger.error(f'Server is broken: status code: {response.status_code}')
+            send_email_alert(f'The Flask server at {SERVER_URL} is broken: {response.content}')
         else:
-            print('Server is up.')
+            logger.info(f'Server is up: {response.content}')
     except requests.exceptions.RequestException as e:
-        print(f'Server is down! Exception: {e}')
-        send_email_alert()
+        logger.error(f'Server is down: exception: {e}')
+        send_email_alert(f'The Flask server at {SERVER_URL} is not reachable: {response.content}')
 
 
 if __name__ == '__main__':
+    logger.info('Health check service started')
     while True:
         check_server()
         time.sleep(CHECK_INTERVAL)
