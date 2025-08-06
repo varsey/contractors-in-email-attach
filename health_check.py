@@ -68,7 +68,7 @@ def check_server():
             logger.info(f'Server is up: {response.content}')
     except requests.exceptions.RequestException as e:
         logger.error(f'Server is down: exception: {e}')
-        send_email_alert(f'The Flask server at {SERVER_URL} is not reachable: {response.content}')
+        send_email_alert(f'The Flask server at {SERVER_URL} is not reachable')
 
 
 if __name__ == '__main__':
