@@ -1,4 +1,5 @@
 import os
+import random
 import shutil
 import pickle
 from typing import Optional
@@ -74,7 +75,8 @@ class MessageProcessor(EmailClient):
 
     def process_email_by_id(self, message_id: str) -> dict:
         if len(message_id) <= 1:
-            return {}
+            log.info('Starting random message_id parsing')
+            return self.random_parse()
         else:
             log.info(f'Starting {message_id} parsing')
             # TO-DO move last_letters to settings
@@ -104,7 +106,13 @@ class MessageProcessor(EmailClient):
             log.info('Parsing finished\n\n')
             clear_folders([f'{os.getcwd()}/temp/'])
             inns = [x['inn'] for x in orgs_dict.values()]
-            return {'inns': list(set([x for xs in inns for x in xs if '*' not in x]))}
+            return {'inns': list({x for xs in inns for x in xs if '*' not in x})}
+
+    def random_parse(self) -> dict:
+        with open(self.index_file, 'rb') as fp:
+            message_ids = pickle.load(fp)
+        message_id = random.choice(list(message_ids.keys())[:10])
+        return self.process_email_by_id(message_id)
 
     def get_index(self, mail_id) -> str:
         try:
@@ -130,11 +138,18 @@ class MessageProcessor(EmailClient):
         self.setup_mail_connector()
         last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
+
         if not os.path.exists(self.index_file):
             log.warning(f'No {self.index_file} file, creating one for {last_letters} last items')
             self.dump_messages(mail_ids, message_ids={})
+
         with open(self.index_file, 'rb') as fp:
-            message_ids = pickle.load(fp)
+            try:
+                message_ids = pickle.load(fp)
+            except EOFError:
+                log.error('Error while loading index file, recreating it')
+                self.dump_messages(mail_ids, message_ids={})
+
         if message_id in message_ids.keys():
             log.info('Message-id found')
             return message_ids
@@ -144,5 +159,7 @@ class MessageProcessor(EmailClient):
         self.dump_messages(mail_ids, message_ids)
         with open(self.index_file, 'rb') as fp:
             message_ids = pickle.load(fp)
+
+        self.teardown_mail_connector()
 
         return message_ids
