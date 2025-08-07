@@ -26,7 +26,7 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 SERVER_URL = os.getenv("SERVER_URL")
-CHECK_INTERVAL = random.choice(range(30, 120))
+CHECK_INTERVAL = random.choice(range(120, 300))
 
 SMTP_SERVER = os.getenv("SMTP_SERVER")
 SMTP_PORT = 587
@@ -60,12 +60,12 @@ def send_email_alert(body: str):
 
 def check_server():
     try:
-        response = requests.get(SERVER_URL, timeout=55)
+        response = requests.get(SERVER_URL, timeout=130)
         if response.status_code != 200:
             logger.error(f'Server is broken: status code: {response.status_code}')
             send_email_alert(f'The Flask server at {SERVER_URL} is broken: {response.content}')
         else:
-            logger.info(f'Server is up: {response.content}')
+            logger.info(f'Server is up: {response.content}, it took {response.elapsed.total_seconds()} s')
     except requests.exceptions.RequestException as e:
         logger.error(f'Server is down: exception: {e}')
         send_email_alert(f'The Flask server at {SERVER_URL} is not reachable')
