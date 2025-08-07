@@ -22,7 +22,7 @@ services:
             - .././:/app
         ports:
           - "8000:8000"
-        command: gunicorn -w 1 --bind 0.0.0.0:8000 --timeout 1200 app:app
+        command: gunicorn -w 2 --bind 0.0.0.0:8000 --timeout 1200 app:app
 
     health-checker:
           build:
