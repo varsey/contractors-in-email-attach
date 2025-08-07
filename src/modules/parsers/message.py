@@ -109,9 +109,14 @@ class MessageProcessor(EmailClient):
             return {'inns': list({x for xs in inns for x in xs if '*' not in x})}
 
     def random_parse(self) -> dict:
-        with open(self.index_file, 'rb') as fp:
-            message_ids = pickle.load(fp)
-        message_id = random.choice(list(message_ids.keys())[:10])
+        message_ids = None
+        if os.path.exists(self.index_file):
+            with open(self.index_file, 'rb') as fp:
+                message_ids = pickle.load(fp)
+        if message_ids:
+            message_id = random.choice(list(message_ids.keys())[:10])
+        else:
+            message_id = 'empty-slug'
         return self.process_email_by_id(message_id)
 
     def get_index(self, mail_id) -> str:
