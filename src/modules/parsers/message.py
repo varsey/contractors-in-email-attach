@@ -160,6 +160,4 @@ class MessageProcessor(EmailClient):
         with open(self.index_file, 'rb') as fp:
             message_ids = pickle.load(fp)
 
-        self.teardown_mail_connector()
-
         return message_ids
