@@ -8,6 +8,11 @@ services:
               memory: 3500M
             reservations:
               memory: 2000M
+        healthcheck:
+          test: curl -sS 0.0.0.0:8000 || exit 1
+          interval: 5s
+          timeout: 10s
+          retries: 3
         env_file:
           - ../.env
         build:
