@@ -233,42 +233,51 @@ class MessageProcessor2(MessageProcessor):
 
     def process_email_by_id_v2(self, message_id: str) -> dict:
         """
-        Process email by ID using database-based caching.
+        Process email by ID using database-based caching and extract date range.
 
         Args:
             message_id: The message ID to process
 
         Returns:
-            Dictionary with parsed INNs
+            Dictionary with date range extraction result:
+            {
+                'start_month': ISO date string or None,
+                'end_month': ISO date string or None,
+                'success': bool
+            }
         """
         if len(message_id) <= 1:
-            return {}
+            return {'start_month': None, 'end_month': None, 'success': False}
+        
+        log.info(f'Starting {message_id} parsing (v2)')
+        message_ids = self.upd_index_v2(message_id, last_letters=40)
+        date_range_result = {'start_month': None, 'end_month': None, 'success': False}
+        
+        if message_ids.get(message_id, 0) != 0:
+            try:
+                data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
+                attach_texts, message_text, header_from = self.get_message_attributes(data)
+                log.info(f'Message text:\n{message_text}')
+                # Extract date range from message text
+                date_range_result = extract_date_range(message_text)
+                log.info(f'Date range extraction: {date_range_result}')
+            except Exception as ex:
+                self.error_processor(ex)
+                log.error('Email processing failed')
+                return {'start_month': None, 'end_month': None, 'success': False}
         else:
-            log.info(f'Starting {message_id} parsing (v2)')
-            message_ids = self.upd_index_v2(message_id, last_letters=40)
-            orgs_dict = {}
-            if message_ids.get(message_id, 0) != 0:
-                try:
-                    data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
-                    attach_texts, message_text, header_from = self.get_message_attributes(data)
-                    # print(attach_texts, '\n', message_text, '\n', header_from)
-                    # extract_date_range(message_text)
-                except Exception as ex:
-                    self.error_processor(ex)
-                    log.error('Email processing failed')
-                    return {}
-            log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
-            log.info('Parsing finished (v2)\n\n')
-            clear_folders([f'{os.getcwd()}/temp/'])
-            inns = [message_text, ]
-            return {'inns': inns}
+            log.warning(f'Message ID {message_id} not found in database')
+        
+        log.info('Parsing finished (v2)\n\n')
+        clear_folders([f'{os.getcwd()}/temp/'])
+        return date_range_result
 
     def process_all_emails_v2(self) -> list:
         """
         Load all message_ids from database and process each one using process_email_by_id_v2().
 
         Returns:
-            List of dictionaries with parsed results for each message_id
+            List of dictionaries with date range extraction results for each message_id
         """
         log.info('Starting batch processing of all emails from database (v2)')
         
@@ -287,7 +296,7 @@ class MessageProcessor2(MessageProcessor):
                 result = self.process_email_by_id_v2(message_id)
                 results.append({
                     'message_id': message_id,
-                    'result': result['inns'] if result else ['No INNs found'],
+                    'result': result,
                     'status': 'success'
                 })
                 processed_count += 1
@@ -295,7 +304,7 @@ class MessageProcessor2(MessageProcessor):
                 log.error(f'Failed to process message_id {message_id}: {ex}')
                 results.append({
                     'message_id': message_id,
-                    'result': {},
+                    'result': {'start_month': None, 'end_month': None, 'success': False},
                     'status': 'failed',
                     'error': str(ex)
                 })

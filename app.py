@@ -42,8 +42,8 @@ def contractor_parser_parameter():
 @app.route("/api/parsing/v2/")
 def contractor_parser_parameter_v2():
     email_id = request.args.get('mid')
-    # card = prc2.process_email_by_id_v2(message_id=email_id)
-    card = prc2.process_all_emails_v2()
+    card = prc2.process_email_by_id_v2(message_id=email_id)
+    # card = prc2.process_all_emails_v2()
     gc.collect()
     return jsonify(card)
 
