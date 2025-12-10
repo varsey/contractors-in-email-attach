@@ -3,10 +3,8 @@ import imaplib
 
 import eml_parser
 
-from src.logger.Logger import Logger
+from src.logger.Logger import log
 from src.modules.parsers.attachment import AttachmentParser
-
-log = Logger().log
 
 
 class EmailClient(AttachmentParser):

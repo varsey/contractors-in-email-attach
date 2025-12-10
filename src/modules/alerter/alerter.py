@@ -1,9 +1,7 @@
 import os
 import smtplib
 from email.mime.text import MIMEText
-from src.logger.Logger import Logger
-
-log = Logger().log
+from src.logger.Logger import log
 
 
 SMTP_SERVER = 'smtp.yandex.ru'

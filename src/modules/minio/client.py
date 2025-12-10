@@ -1,4 +1,5 @@
 import boto3
+from src.logger.Logger import log
 
 
 class MinioClient:

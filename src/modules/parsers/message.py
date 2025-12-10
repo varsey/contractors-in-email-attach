@@ -7,15 +7,13 @@ from typing import Optional
 
 import requests
 
-from src.logger.Logger import Logger
+from src.logger.Logger import log
 from src.modules.parsers.text import TextParser
 from src.modules.parsers.attachment import AttachmentParser
 from src.modules.email.client import EmailClient
 from src.modules.alerter.alerter import send_email_alert
 from src.modules.generator.pdf import generate_pdf
 from src.modules.minio.client import MinioClient
-
-log = Logger().log
 
 s3 = MinioClient()
 
@@ -192,3 +190,48 @@ class MessageProcessor(EmailClient):
 
             log.info('Processing successful')
             return {'attach': attach_texts, 'mail': message_text}
+
+
+    def process_email_by_id_v2(self, message_id: str) -> dict:
+        """
+        Process email by ID using database-based caching.
+
+        Args:
+            message_id: The message ID to process
+
+        Returns:
+            Dictionary with parsed INNs
+        """
+        if len(message_id) <= 1:
+            return {}
+        else:
+            log.info(f'Starting {message_id} parsing (v2)')
+            message_ids = self.upd_index_v2(message_id, last_letters=20)
+            orgs_dict = {}
+            if message_ids.get(message_id, 0) != 0:
+                try:
+                    data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
+                    attach_texts, message_text, header_from = self.get_message_attributes(data)
+                    print(f'{attach_texts=}')
+                    print(f'{header_from=}')
+                    print(attach_texts, '\n', message_text, '\n', header_from)
+                    organization_candidates = self.parse_attributes(attach_texts, message_text)
+                    if (
+                        len(organization_candidates.values()) == 1
+                        and
+                        '*' in str(organization_candidates.values())
+                    ):
+                        send_email_alert(header_from)
+                    organization = compose_organizations(organization_candidates)
+                    for k, v in organization_candidates.items():
+                        log.info(f'\n{k}:\n{v}')
+                    orgs_dict.update(organization)
+                except Exception as ex:
+                    self.error_processor(ex)
+                    log.error('Email processing failed')
+                    return {}
+            log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
+            log.info('Parsing finished (v2)\n\n')
+            clear_folders([f'{os.getcwd()}/temp/'])
+            inns = [x['inn'] for x in orgs_dict.values()]
+            return {'inns': list(set([x for xs in inns for x in xs if '*' not in x]))}

@@ -6,8 +6,19 @@ import logging.handlers as handlers
 
 class Logger:
     LOG_FORMAT = "%(asctime)-15s %(name)s %(levelname)-8s %(message)s"
+    _instance = None
+    _initialized = False
+
+    def __new__(cls, log_name: str = 'logs.txt'):
+        if cls._instance is None:
+            cls._instance = super(Logger, cls).__new__(cls)
+        return cls._instance
 
     def __init__(self, log_name: str = 'logs.txt'):
+        if Logger._initialized:
+            return
+        Logger._initialized = True
+        
         logger_name = os.uname().nodename
         logger = logging.getLogger(logger_name)
         logging.basicConfig(filename=log_name, encoding='utf-8', level=logging.INFO, format=self.LOG_FORMAT)
@@ -19,3 +30,8 @@ class Logger:
         handler2.setFormatter(logging.Formatter(self.LOG_FORMAT))
         logger.addHandler(handler2)
         self.log = logger
+
+
+# Create a single logger instance at module level
+_logger_instance = Logger()
+log = _logger_instance.log

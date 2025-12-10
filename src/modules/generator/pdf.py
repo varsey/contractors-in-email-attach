@@ -1,5 +1,7 @@
 import pdfkit
 
+from src.logger.Logger import log
+
 config = pdfkit.configuration(wkhtmltopdf='/usr/local/bin/wkhtmltopdf')
 
 
