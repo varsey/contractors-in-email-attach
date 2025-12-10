@@ -14,6 +14,7 @@ from src.modules.email.client import EmailClient
 from src.modules.alerter.alerter import send_email_alert
 from src.modules.generator.pdf import generate_pdf
 from src.modules.minio.client import MinioClient
+from src.modules.database.client import DatabaseClient
 
 s3 = MinioClient()
 
@@ -169,28 +170,155 @@ class MessageProcessor(EmailClient):
             log.info('Parsing finished\n\n')
             clear_folders([f'{os.getcwd()}/temp/'])
 
+            # log.info('Starting ai processing....')
             names = []
-            names.extend(generate_pdf({'mail': message_text}))
-            names.extend(generate_pdf(attach_texts))
-            print(names)
-            for name in names:
-                print('uploading', f'{os.getcwd()}/{name}')
-                s3.upload_file(f'{os.getcwd()}/{name}')
+            message_text = message_text if 'уважением' not in message_text.lower() else message_text.split('уважением')[0]
+            # names.extend(generate_pdf({'mail': message_text}))
+            # names.extend(generate_pdf(attach_texts))
+            # log.info(str(names))
+            # for name in names:
+            #     log.info(f'Uploading {os.getcwd()}/temp/{name}')
+            #     s3.upload_file(f'{os.getcwd()}/temp/{name}')
+            #
+            # data = {
+            #     "urls": [f"https://storage.yandexcloud.net/varsey-backet/mails/{file}" for file in names]
+            # }
+            # log.info(str(data))
+            # response = requests.post(URL, headers={"Content-Type": "application/json"}, data=json.dumps(data))
+            #
+            # if response.status_code == 200:
+            #     log.info(f"Response JSON: {response.json()}")
+            # else:
+            #     log.error(f"Error: {response.status_code, response.text}")
+            #
+            # item_collections, consumer, appendix = {}, {'Адрес': 'не удалось определить', 'Город': 'не удалось определить', 'Имя покупателя': 'не удалось определить', 'Способ доставки': 'не удалось определить'}, ''
+            # log.info('Processing successful')
+            # for num, name in enumerate(names):
+            #     log.info(name)
+            #     try:
+            #         if 'response' in dict(response.json()).keys():
+            #             if 'mail' in name:
+            #                 log.info('Товары')
+            #                 log.info(str(dict(response.json())))
+            #                 for k, v in dict(response.json())['response'][num]['content'].items():
+            #                     log.info(f'Товар {k}: {v}')
+            #                     item_collections[k] = v
+            #                     appendix = str(item_collections[k]['Номер товара']) if len(str(item_collections[k]['Номер товара'])) > 4 else ''
+            #                     appendix = appendix + ' ' + item_collections[k]['Габариты'] if len(str(item_collections[k]['Габариты'])) > 4 else appendix
+            #                     appendix = appendix + ' ' + item_collections[k]['Размер'] if len(str(item_collections[k]['Размер'])) > 4 else appendix
+            #                     item_collections[k]['Имя товара'] = item_collections[k]['Имя товара'] + ' ' + appendix if item_collections[k]['Имя товара'] else ''
+            #                     item_collections[k]['Количество товара'] = str(item_collections[k]['Количество товара']) + ' ' + str(item_collections[k]['Измерение количества товара']) if item_collections[k]['Количество товара'] else 'не удалось определить'
+            #                     for tag in ['Номер товара', 'Габариты', 'Размер', 'Длина', 'Единицы измерения длины', 'Измерение количества товара']:
+            #                         if tag in item_collections[k].keys():
+            #                             del item_collections[k][tag]
+            #
+            #                     if len(str(item_collections[k]["Имя товара"])) > 4:
+            #                         url = f'http://51.250.21.24/find?text={item_collections[k]["Имя товара"]}'
+            #                         item_collections[k]['Имя товара - каталог'] = requests.get(url).json()['0']
+            #                     else:
+            #                         item_collections[k]['Имя товара - каталог'] = 'не найдено'
+            #
+            #             elif 'mail' not in name:
+            #                 try:
+            #                     log.info(f'Реквизиты : {response.json()}')
+            #                     if len(dict(response.json())['response']) > 0:
+            #                         consumer = dict(response.json())['response'][-1]['content'][0]
+            #                 except Exception as ex:
+            #                     log.error(f'Email processing failed: {ex}')
+            #                     consumer = {'Адрес': 'не удалось определить',
+            #                                               'Город': 'не удалось определить',
+            #                                               'Имя покупателя': 'не удалось определить',
+            #                                               'Способ доставки': 'не удалось определить'},
+            #
+            #         else:
+            #             print(response.json())
+            #     except Exception as ex:
+            #         print(ex)
+            #         log.error(f'Email processing failed: {ex.__traceback__.__str__()}')
+            #
+            # print(consumer)
+            # print((dict(item_collections)))
+            #
+            # purchase = {
+            #     "number": "1",
+            #     'date': date.today().strftime('%Y%m%d'),
+            #     "delivery": consumer['Способ доставки'],
+            #     "delivery_sum": "0",
+            #     "delivery_address": consumer['Адрес'],
+            #     "delivery_city":  consumer['Город'],
+            #     "delivery_type": None,
+            #     "delivery_partner": None,
+            #     "total_sum": None,
+            #     "contractor_name": consumer['Имя покупателя'],
+            #     "contractor_xml_id": "55def411-41a0-11ea-80d7-ac1f6b7f39e9",
+            #     "contractor_inn": inn_value,
+            #     "contractor_kpp": None,
+            #     "contractor_adress": consumer['Адрес'],
+            #     'goods': (dict(item_collections)) #  {k: v for k, v in dict(item_collections).items()},
+            # }
 
-            data = {
-                "urls": [f"https://storage.yandexcloud.net/varsey-backet/mails/{file}" for file in names if 'карт' in file or 'mail' in file]
-            }
-            print(data, '***')
-            response = requests.post(URL, headers={"Content-Type": "application/json"}, data=json.dumps(data))
+            res = {'mail': message_text.replace('\n', ' ')}
+            return res
 
-            if response.status_code == 200:
-                print("Response JSON:", response.json())
-            else:
-                print("Error:", response.status_code, response.text)
 
-            log.info('Processing successful')
-            return {'attach': attach_texts, 'mail': message_text}
+class MessageProcessor2(MessageProcessor):
+    """
+    MessageProcessor variant that uses SQLite database for caching instead of pickle files.
+    Uses EMAIL2 and PASS2 credentials for a different mailbox.
+    """
+    def __init__(self, email: str, password: str, server: str, mail_folder: str, db_path: str = 'message_ids.db'):
+        super().__init__(email, password, server, mail_folder)
+        self.db_client = DatabaseClient(db_path=db_path)
+        log.info(f'MessageProcessor2 initialized with database at {db_path}')
 
+    def dump_messages_v2(self, mail_ids, message_ids):
+        """
+        Save message IDs to SQLite database instead of pickle file.
+
+        Args:
+            mail_ids: List of mail IDs to process
+            message_ids: Dictionary of existing message_id -> mail_id mappings
+        """
+        log.info('Dumping messages to database, please wait...')
+        new_entries = 0
+        for num, mail_id in enumerate(mail_ids):
+            if mail_id not in message_ids.values():
+                indx = self.get_index(mail_id)
+                if len(indx) > 0 and indx not in message_ids.keys():
+                    if self.db_client.save_message_id(indx, mail_id):
+                        message_ids[indx] = mail_id
+                        new_entries += 1
+        log.info(f'Saved {new_entries} new message IDs to database')
+
+    def upd_index_v2(self, message_id: Optional[str], last_letters: int = 30):
+        """
+        Update message ID index using SQLite database instead of pickle file.
+
+        Args:
+            message_id: The message ID to search for
+            last_letters: Number of last emails to check
+
+        Returns:
+            Dictionary of message_id -> mail_id mappings
+        """
+        self.setup_mail_connector()
+        last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
+        mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
+
+        # Get all existing message IDs from database
+        message_ids = self.db_client.get_all_message_ids()
+
+        if message_id in message_ids.keys():
+            log.info('Message-id found in database')
+            return message_ids
+        else:
+            log.warning('Message-id not found in database')
+
+        self.dump_messages_v2(mail_ids, message_ids)
+        # Reload message IDs after dump
+        message_ids = self.db_client.get_all_message_ids()
+
+        return message_ids
 
     def process_email_by_id_v2(self, message_id: str) -> dict:
         """
@@ -212,8 +340,6 @@ class MessageProcessor(EmailClient):
                 try:
                     data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
                     attach_texts, message_text, header_from = self.get_message_attributes(data)
-                    print(f'{attach_texts=}')
-                    print(f'{header_from=}')
                     print(attach_texts, '\n', message_text, '\n', header_from)
                     organization_candidates = self.parse_attributes(attach_texts, message_text)
                     if (
