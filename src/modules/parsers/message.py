@@ -3,26 +3,20 @@ import json
 import random
 import shutil
 import pickle
+import imaplib
 from typing import Optional
-
-import requests
 
 from src.logger.Logger import log
 from src.modules.parsers.text import TextParser
 from src.modules.parsers.attachment import AttachmentParser
+from src.modules.parsers.date_range_extractor import extract_date_range
 from src.modules.email.client import EmailClient
 from src.modules.alerter.alerter import send_email_alert
-from src.modules.generator.pdf import generate_pdf
 from src.modules.minio.client import MinioClient
 from src.modules.database.client import DatabaseClient
 
 s3 = MinioClient()
 
-URL = "http://158.160.98.2:8000/parse_pdf"
-
-
-def compose_organizations(organization_dict: dict) -> dict:
-    return {k: v for k, v in organization_dict.items()}
 
 
 def clear_folders(folder_paths: list):
@@ -101,10 +95,9 @@ class MessageProcessor(EmailClient):
                         '*' in str(organization_candidates.values())
                     ):
                         send_email_alert(header_from)
-                    organization = compose_organizations(organization_candidates)
                     for k, v in organization_candidates.items():
                         log.info(f'\n{k}:\n{v}')
-                    orgs_dict.update(organization)
+                    orgs_dict.update(organization_candidates)
                 except Exception as ex:
                     self.error_processor(ex)
                     log.error('Email processing failed')
@@ -170,92 +163,7 @@ class MessageProcessor(EmailClient):
             log.info('Parsing finished\n\n')
             clear_folders([f'{os.getcwd()}/temp/'])
 
-            # log.info('Starting ai processing....')
-            names = []
             message_text = message_text if 'уважением' not in message_text.lower() else message_text.split('уважением')[0]
-            # names.extend(generate_pdf({'mail': message_text}))
-            # names.extend(generate_pdf(attach_texts))
-            # log.info(str(names))
-            # for name in names:
-            #     log.info(f'Uploading {os.getcwd()}/temp/{name}')
-            #     s3.upload_file(f'{os.getcwd()}/temp/{name}')
-            #
-            # data = {
-            #     "urls": [f"https://storage.yandexcloud.net/varsey-backet/mails/{file}" for file in names]
-            # }
-            # log.info(str(data))
-            # response = requests.post(URL, headers={"Content-Type": "application/json"}, data=json.dumps(data))
-            #
-            # if response.status_code == 200:
-            #     log.info(f"Response JSON: {response.json()}")
-            # else:
-            #     log.error(f"Error: {response.status_code, response.text}")
-            #
-            # item_collections, consumer, appendix = {}, {'Адрес': 'не удалось определить', 'Город': 'не удалось определить', 'Имя покупателя': 'не удалось определить', 'Способ доставки': 'не удалось определить'}, ''
-            # log.info('Processing successful')
-            # for num, name in enumerate(names):
-            #     log.info(name)
-            #     try:
-            #         if 'response' in dict(response.json()).keys():
-            #             if 'mail' in name:
-            #                 log.info('Товары')
-            #                 log.info(str(dict(response.json())))
-            #                 for k, v in dict(response.json())['response'][num]['content'].items():
-            #                     log.info(f'Товар {k}: {v}')
-            #                     item_collections[k] = v
-            #                     appendix = str(item_collections[k]['Номер товара']) if len(str(item_collections[k]['Номер товара'])) > 4 else ''
-            #                     appendix = appendix + ' ' + item_collections[k]['Габариты'] if len(str(item_collections[k]['Габариты'])) > 4 else appendix
-            #                     appendix = appendix + ' ' + item_collections[k]['Размер'] if len(str(item_collections[k]['Размер'])) > 4 else appendix
-            #                     item_collections[k]['Имя товара'] = item_collections[k]['Имя товара'] + ' ' + appendix if item_collections[k]['Имя товара'] else ''
-            #                     item_collections[k]['Количество товара'] = str(item_collections[k]['Количество товара']) + ' ' + str(item_collections[k]['Измерение количества товара']) if item_collections[k]['Количество товара'] else 'не удалось определить'
-            #                     for tag in ['Номер товара', 'Габариты', 'Размер', 'Длина', 'Единицы измерения длины', 'Измерение количества товара']:
-            #                         if tag in item_collections[k].keys():
-            #                             del item_collections[k][tag]
-            #
-            #                     if len(str(item_collections[k]["Имя товара"])) > 4:
-            #                         url = f'http://51.250.21.24/find?text={item_collections[k]["Имя товара"]}'
-            #                         item_collections[k]['Имя товара - каталог'] = requests.get(url).json()['0']
-            #                     else:
-            #                         item_collections[k]['Имя товара - каталог'] = 'не найдено'
-            #
-            #             elif 'mail' not in name:
-            #                 try:
-            #                     log.info(f'Реквизиты : {response.json()}')
-            #                     if len(dict(response.json())['response']) > 0:
-            #                         consumer = dict(response.json())['response'][-1]['content'][0]
-            #                 except Exception as ex:
-            #                     log.error(f'Email processing failed: {ex}')
-            #                     consumer = {'Адрес': 'не удалось определить',
-            #                                               'Город': 'не удалось определить',
-            #                                               'Имя покупателя': 'не удалось определить',
-            #                                               'Способ доставки': 'не удалось определить'},
-            #
-            #         else:
-            #             print(response.json())
-            #     except Exception as ex:
-            #         print(ex)
-            #         log.error(f'Email processing failed: {ex.__traceback__.__str__()}')
-            #
-            # print(consumer)
-            # print((dict(item_collections)))
-            #
-            # purchase = {
-            #     "number": "1",
-            #     'date': date.today().strftime('%Y%m%d'),
-            #     "delivery": consumer['Способ доставки'],
-            #     "delivery_sum": "0",
-            #     "delivery_address": consumer['Адрес'],
-            #     "delivery_city":  consumer['Город'],
-            #     "delivery_type": None,
-            #     "delivery_partner": None,
-            #     "total_sum": None,
-            #     "contractor_name": consumer['Имя покупателя'],
-            #     "contractor_xml_id": "55def411-41a0-11ea-80d7-ac1f6b7f39e9",
-            #     "contractor_inn": inn_value,
-            #     "contractor_kpp": None,
-            #     "contractor_adress": consumer['Адрес'],
-            #     'goods': (dict(item_collections)) #  {k: v for k, v in dict(item_collections).items()},
-            # }
 
             res = {'mail': message_text.replace('\n', ' ')}
             return res
@@ -283,11 +191,14 @@ class MessageProcessor2(MessageProcessor):
         new_entries = 0
         for num, mail_id in enumerate(mail_ids):
             if mail_id not in message_ids.values():
-                indx = self.get_index(mail_id)
-                if len(indx) > 0 and indx not in message_ids.keys():
-                    if self.db_client.save_message_id(indx, mail_id):
-                        message_ids[indx] = mail_id
-                        new_entries += 1
+                try:
+                    indx = self.get_index(mail_id)
+                    if len(indx) > 0 and indx not in message_ids.keys():
+                        if self.db_client.save_message_id(indx, mail_id):
+                            message_ids[indx] = mail_id
+                            new_entries += 1
+                except imaplib.IMAP4.error:
+                    log.warning(f'Cant find email_id at server, skipping')
         log.info(f'Saved {new_entries} new message IDs to database')
 
     def upd_index_v2(self, message_id: Optional[str], last_letters: int = 30):
@@ -334,24 +245,14 @@ class MessageProcessor2(MessageProcessor):
             return {}
         else:
             log.info(f'Starting {message_id} parsing (v2)')
-            message_ids = self.upd_index_v2(message_id, last_letters=20)
+            message_ids = self.upd_index_v2(message_id, last_letters=40)
             orgs_dict = {}
             if message_ids.get(message_id, 0) != 0:
                 try:
                     data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
                     attach_texts, message_text, header_from = self.get_message_attributes(data)
-                    print(attach_texts, '\n', message_text, '\n', header_from)
-                    organization_candidates = self.parse_attributes(attach_texts, message_text)
-                    if (
-                        len(organization_candidates.values()) == 1
-                        and
-                        '*' in str(organization_candidates.values())
-                    ):
-                        send_email_alert(header_from)
-                    organization = compose_organizations(organization_candidates)
-                    for k, v in organization_candidates.items():
-                        log.info(f'\n{k}:\n{v}')
-                    orgs_dict.update(organization)
+                    # print(attach_texts, '\n', message_text, '\n', header_from)
+                    # extract_date_range(message_text)
                 except Exception as ex:
                     self.error_processor(ex)
                     log.error('Email processing failed')
@@ -359,5 +260,45 @@ class MessageProcessor2(MessageProcessor):
             log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
             log.info('Parsing finished (v2)\n\n')
             clear_folders([f'{os.getcwd()}/temp/'])
-            inns = [x['inn'] for x in orgs_dict.values()]
-            return {'inns': list(set([x for xs in inns for x in xs if '*' not in x]))}
+            inns = [message_text, ]
+            return {'inns': inns}
+
+    def process_all_emails_v2(self) -> list:
+        """
+        Load all message_ids from database and process each one using process_email_by_id_v2().
+
+        Returns:
+            List of dictionaries with parsed results for each message_id
+        """
+        log.info('Starting batch processing of all emails from database (v2)')
+        
+        # Load all message_ids from database
+        message_ids = self.db_client.get_all_message_ids()
+        log.info(f'Found {len(message_ids)} message_ids in database')
+        
+        results = []
+        processed_count = 0
+        failed_count = 0
+        
+        # Process each message_id one by one
+        for message_id in message_ids.keys():
+            log.info(f'Processing {processed_count + 1}/{len(message_ids)}: {message_id}')
+            try:
+                result = self.process_email_by_id_v2(message_id)
+                results.append({
+                    'message_id': message_id,
+                    'result': result['inns'] if result else ['No INNs found'],
+                    'status': 'success'
+                })
+                processed_count += 1
+            except Exception as ex:
+                log.error(f'Failed to process message_id {message_id}: {ex}')
+                results.append({
+                    'message_id': message_id,
+                    'result': {},
+                    'status': 'failed',
+                    'error': str(ex)
+                })
+                failed_count += 1
+        log.info(f'Batch processing completed: {processed_count} successful, {failed_count} failed')
+        return results
