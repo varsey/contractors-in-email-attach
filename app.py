@@ -1,12 +1,10 @@
 import gc
 import logging
-import traceback
 
 from flask import Flask, jsonify, request
 
 from src.modules.parsers.message import MessageProcessor, MessageProcessor2
 from src.config.cfg import Config
-from src.logger.Logger import log
 
 app = Flask(__name__)
 cfg = Config()
@@ -14,17 +12,6 @@ prc = MessageProcessor(**cfg.creds)
 prc2 = MessageProcessor2(**cfg.creds2)
 
 logging.getLogger('pymorphy2.opencorpora_dict.wrapper').setLevel(logging.ERROR)
-
-
-@app.errorhandler(Exception)
-def handle_exception(e):
-    """Handle all uncaught exceptions and log full traceback"""
-    log.error("Internal Server Error occurred:")
-    log.error(traceback.format_exc())
-    return jsonify({
-        'error': 'Internal Server Error',
-        'message': 'The server encountered an internal error and was unable to complete your request.'
-    }), 500
 
 
 @app.route("/")
