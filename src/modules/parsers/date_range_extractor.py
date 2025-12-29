@@ -63,6 +63,11 @@ def extract_date_range(message: str) -> Dict[str, any]:
     if result['success']:
         return result
     
+    # 9. Period: "за 3 период 2025 года" (as quarter)
+    result = extract_period(text)
+    if result['success']:
+        return result
+    
     # No pattern matched
     return {'start_month': None, 'end_month': None, 'success': False}
 
@@ -298,3 +303,31 @@ def get_last_day_of_month(year: int, month: int) -> date:
         next_month = date(year, month + 1, 1)
         from datetime import timedelta
         return next_month - timedelta(days=1)
+
+def extract_period(text: str) -> Dict[str, any]:
+    """Extract period references like 'за 3 период 2025 года' interpreted as quarter"""
+    patterns = [
+        r'(\d+)[-\s]*[йяе]*\s*период[а-яё]*\s*(\d{4})',
+        r'период[а-яё]*\s*(\d+)\s*(\d{4})',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            quarter = int(match.group(1))
+            year = int(match.group(2))
+            
+            if 2000 <= year <= 2100 and 1 <= quarter <= 4:
+                start_month = (quarter - 1) * 3 + 1
+                end_month = quarter * 3
+                
+                start_date = date(year, start_month, 1)
+                end_date = get_last_day_of_month(year, end_month)
+                
+                return {
+                    'start_month': start_date.isoformat(),
+                    'end_month': end_date.isoformat(),
+                    'success': True
+                }
+    
+    return {'start_month': None, 'end_month': None, 'success': False}
