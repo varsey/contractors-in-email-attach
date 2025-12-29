@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, date
-from typing import Dict, Optional, Tuple
+from typing import Dict
 
 
 def extract_date_range(message: str) -> Dict[str, any]:
@@ -20,16 +20,9 @@ def extract_date_range(message: str) -> Dict[str, any]:
     """
     if not message:
         return {'start_month': None, 'end_month': None, 'success': False}
-    
-    # Normalize the text
+
     text = message.lower()
-    
-    # Check if this is related to "акт сверки" context
-    context_keywords = ['акт', 'сверк', 'расчет', 'взаимн']
-    has_context = any(keyword in text for keyword in context_keywords)
-    
-    # Try different extraction patterns in order of specificity
-    
+
     # 1. Explicit date range: DD.MM.YYYY - DD.MM.YYYY
     result = extract_explicit_date_range(text)
     if result['success']:
