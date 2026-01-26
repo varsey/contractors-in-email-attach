@@ -114,9 +114,7 @@ class MessageProcessor(EmailClient):
         """
         Extract Message-ID from an email by mail_id.
         
-        First tries to fetch only the MESSAGE-ID header for efficiency.
-        If that fails (e.g., for threaded messages or malformed emails),
-        falls back to fetching the full message and parsing the Message-ID.
+        tries  fetching the full message and parsing the Message-ID.
         
         Args:
             mail_id: The IMAP mail ID to fetch
@@ -125,23 +123,9 @@ class MessageProcessor(EmailClient):
             The Message-ID string (without angle brackets) or empty string if not found
         """
         idx = ''
-        
-        # # First attempt: fetch only the MESSAGE-ID header (efficient)
-        # try:
-        #     header_response = self.mail_connector.fetch(mail_id, '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])')
-        #     idx = ''.join((header_response[1][0][-1]
-        #         .decode('UTF-8')
-        #         .split('<')[1]
-        #         .split('>'))[:-1])
-        #     if idx:
-        #         return idx
-        # except (IndexError, TypeError, AttributeError):
-        #     pass
-        
-        # Fallback: fetch full message and parse Message-ID using email library
+
         # Use BODY.PEEK[] instead of RFC822 to avoid marking the email as read
         try:
-            log.info(f'Header-only fetch failed for mail_id {mail_id}, falling back to full message fetch')
             full_response = self.mail_connector.fetch(mail_id, '(BODY.PEEK[])')
             if full_response[0] == 'OK' and full_response[1] and full_response[1][0]:
                 msg = message_from_bytes(full_response[1][0][1])
