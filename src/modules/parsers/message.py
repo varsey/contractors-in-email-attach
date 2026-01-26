@@ -5,6 +5,7 @@ import shutil
 import pickle
 import imaplib
 from typing import Optional
+from email import message_from_bytes
 
 from src.logger.Logger import log
 from src.modules.parsers.text import TextParser
@@ -34,14 +35,15 @@ def clear_folders(folder_paths: list):
 
 
 class MessageProcessor(EmailClient):
-    def __init__(self, email: str, password: str, server: str, mail_folder: str):
+    def __init__(self, email: str, password: str, server: str, mail_folder: str, db_path: str = 'message_ids_v1.db'):
         AttachmentParser.__init__(self)
         # TO-DO remove email client from here
         EmailClient.__init__(self, email, password, server, mail_folder)
         self.parsers = TextParser()
-        # TO-DO move name to settings
-        self.index_file = 'message_ids.pkl'
         self.mail_folder = mail_folder
+        # Initialize database client for SQL-based message ID storage
+        self.db_client = DatabaseClient(db_path=db_path)
+        log.info(f'MessageProcessor initialized with database at {db_path}')
 
     @staticmethod
     def org_structure(inns):
@@ -81,7 +83,7 @@ class MessageProcessor(EmailClient):
         else:
             log.info(f'Starting {message_id} parsing')
             # TO-DO move last_letters to settings
-            message_ids = self.upd_index(message_id, last_letters=20)
+            message_ids = self.upd_index(message_id, last_letters=120)
             orgs_dict = {}
             if message_ids.get(message_id, 0) != 0:
             # for message_id in list(message_ids.keys())[:1000]:
@@ -116,36 +118,83 @@ class MessageProcessor(EmailClient):
             .split('>'))[:-1])
         except (IndexError, TypeError):
             return ''
+
         return idx
 
     def dump_messages(self, mail_ids, message_ids):
-        log.info('Dumping messages, please wait...')
+        """
+        Save message IDs to SQLite database instead of pickle file.
+
+        Args:
+            mail_ids: List of mail IDs to process
+            message_ids: Dictionary of existing message_id -> mail_id mappings
+        
+        Returns:
+            Updated dictionary of message_id -> mail_id mappings
+        """
+        log.info('Dumping messages to database, please wait...')
+        new_entries = 0
         for num, mail_id in enumerate(mail_ids):
             if mail_id not in message_ids.values():
-                indx = self.get_index(mail_id)
-                if len(indx) > 0 and indx not in message_ids.keys():
-                    message_ids[indx] = mail_id
-        with open(self.index_file, 'wb') as fp:
-            pickle.dump(message_ids, fp, protocol=pickle.HIGHEST_PROTOCOL)
+                try:
+                    indx = self.get_index(mail_id)
+                    if len(indx) > 0 and indx not in message_ids.keys():
+                        if self.db_client.save_message_id(indx, mail_id):
+                            message_ids[indx] = mail_id
+                            new_entries += 1
+                except imaplib.IMAP4.error:
+                    log.warning(f'Cannot find email_id at server, skipping')
+        log.info(f'Saved {new_entries} new message IDs to database')
+        return message_ids
 
     def upd_index(self, message_id: Optional[str], last_letters: int = 30):
+        """
+        Update message ID index using SQLite database instead of pickle file.
+
+        Args:
+            message_id: The message ID to search for
+            last_letters: Number of last emails to check
+
+        Returns:
+            Dictionary of message_id -> mail_id mappings
+        """
         self.setup_mail_connector()
         last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
-        if not os.path.exists(self.index_file):
-            log.warning(f'No {self.index_file} file, creating one for {last_letters} last items')
-            self.dump_messages(mail_ids, message_ids={})
-        with open(self.index_file, 'rb') as fp:
-            message_ids = pickle.load(fp)
+
+        # Get all existing message IDs from database
+        message_ids = self.db_client.get_all_message_ids()
+        print(f'Existing message IDs count: {len(message_ids)}')
+        print(f'Existing message IDs: {message_ids}')
+
         if message_id in message_ids.keys():
-            log.info('Message-id found')
+            log.info('Message-id found in database')
             return message_ids
         else:
-            log.warning('Message-id not found')
+            log.warning('Message-id not found in database, fetching new messages')
 
+        # Dump new messages to database
         self.dump_messages(mail_ids, message_ids)
-        with open(self.index_file, 'rb') as fp:
-            message_ids = pickle.load(fp)
+        # Reload message IDs after dump
+        message_ids = self.db_client.get_all_message_ids()
+
+
+        self.setup_mail_connector()
+        last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
+        mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
+
+        # Get all existing message IDs from database
+        message_ids = self.db_client.get_all_message_ids()
+
+        if message_id in message_ids.keys():
+            log.info('Message-id found in database')
+            return message_ids
+        else:
+            log.warning('Message-id not found in database')
+
+        self.dump_messages_v2(mail_ids, message_ids)
+        # Reload message IDs after dump
+        message_ids = self.db_client.get_all_message_ids()
 
         return message_ids
 
@@ -189,6 +238,7 @@ class MessageProcessor2(MessageProcessor):
         """
         log.info('Dumping messages to database, please wait...')
         new_entries = 0
+        log.info('222')
         for num, mail_id in enumerate(mail_ids):
             if mail_id not in message_ids.values():
                 try:
