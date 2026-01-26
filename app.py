@@ -1,10 +1,12 @@
 import gc
 import logging
+import traceback
 
 from flask import Flask, jsonify, request
 
-from src.modules.parsers.message import MessageProcessor, MessageProcessor2
+from src.modules.parsers.message import MessageProcessor, MessageProcessor2, MessageNotFoundError
 from src.config.cfg import Config
+from src.logger.Logger import log
 
 app = Flask(__name__)
 cfg = Config()
@@ -22,23 +24,46 @@ def route_status():
 @app.route("/api/parsing/")
 def contractor_parser_parameter():
     email_id = request.args.get('mid')
-    card = prc.process_email_by_id(message_id=email_id)
-    gc.collect()
-    return jsonify(card)
+    try:
+        card = prc.process_email_by_id(message_id=email_id)
+        gc.collect()
+        return jsonify(card)
+    except MessageNotFoundError as e:
+        log.warning(f"Message not found: {e}")
+        return jsonify({"error": "message-id not found"}), 404
+    except Exception as e:
+        log.error(f"Error processing mid {email_id}: {e}")
+        log.error(traceback.format_exc())
+        return jsonify({"error": str(e), "status": "failed"}), 500
+
 
 @app.route("/api/parsing/v2/")
 def contractor_parser_parameter_v2():
     email_id = request.args.get('mid')
-    card = prc2.process_email_by_id_v2(message_id=email_id)
-    # card = prc2.process_all_emails_v2()
-    gc.collect()
-    return jsonify(card)
+    try:
+        card = prc2.process_email_by_id_v2(message_id=email_id)
+        # card = prc2.process_all_emails_v2()
+        gc.collect()
+        return jsonify(card)
+    except MessageNotFoundError as e:
+        log.warning(f"Message not found (v2): {e}")
+        return jsonify({"error": "message-id not found"}), 404
+    except Exception as e:
+        log.error(f"Error processing mid {email_id} (v2): {e}")
+        log.error(traceback.format_exc())
+        return jsonify({"error": str(e), "status": "failed"}), 500
+
 
 @app.route("/sample/")
 def parse_random():
-    card = prc.process_random_id()
-    gc.collect()
-    return jsonify(card)
+    try:
+        card = prc.process_random_id()
+        gc.collect()
+        return jsonify(card)
+    except Exception as e:
+        log.error(f"Error processing random id: {e}")
+        log.error(traceback.format_exc())
+        return jsonify({"error": str(e), "status": "failed"}), 500
 
 
 

@@ -29,7 +29,8 @@ class AttachmentParser:
         if type(ex) == exceptions.PackageNotFoundError:
             log.info('CANT PROCESS ATTACHMENT FILE')
         else:
-            [log.info(f'{item}') for item in traceback.format_exception(type(ex), ex, ex.__traceback__)]
+            traceback_str = "".join(traceback.format_exception(type(ex), ex, ex.__traceback__))
+            log.error(f"Full traceback:\n{traceback_str}")
         return None
 
     @staticmethod

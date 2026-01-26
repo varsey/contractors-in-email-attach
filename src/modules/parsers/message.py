@@ -1,8 +1,6 @@
 import os
-import json
 import random
 import shutil
-import pickle
 import imaplib
 from typing import Optional
 from email import message_from_bytes
@@ -32,6 +30,12 @@ def clear_folders(folder_paths: list):
             except Exception as e:
                 log.error(f'Failed to delete {file_path}: {e}')
     return None
+
+
+
+class MessageNotFoundError(Exception):
+    """Exception raised when a message ID is not found in the database."""
+    pass
 
 
 class MessageProcessor(EmailClient):
@@ -80,7 +84,7 @@ class MessageProcessor(EmailClient):
     def process_email_by_id(self, message_id: str) -> dict:
         if len(message_id) <= 1:
             return {}
-        else:
+        try:
             log.info(f'Starting {message_id} parsing')
             # TO-DO move last_letters to settings
             message_ids = self.upd_index(message_id, last_letters=120)
@@ -104,11 +108,19 @@ class MessageProcessor(EmailClient):
                     self.error_processor(ex)
                     log.error('Email processing failed')
                     return {}
+            else:
+                raise MessageNotFoundError(f"Message-id {message_id} not found in database")
             log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
             log.info('Parsing finished\n\n')
             clear_folders([f'{os.getcwd()}/temp/'])
             inns = [x['inn'] for x in orgs_dict.values()]
             return {'inns': list(set([x for xs in inns for x in xs if '*' not in x]))}
+        except MessageNotFoundError:
+            raise
+        except Exception as ex:
+            self.error_processor(ex)
+            log.error(f'Critical error in process_email_by_id: {ex}')
+            return {}
 
     def get_index(self, mail_id) -> str:
         """
@@ -210,13 +222,18 @@ class MessageProcessor(EmailClient):
         else:
             log.warning('Message-id not found in database')
 
-        self.dump_messages_v2(mail_ids, message_ids)
+        if hasattr(self, 'dump_messages_v2'):
+            self.dump_messages_v2(mail_ids, message_ids)
+        else:
+            self.dump_messages(mail_ids, message_ids)
+
         # Reload message IDs after dump
         message_ids = self.db_client.get_all_message_ids()
 
         return message_ids
 
     def process_random_id(self) -> dict:
+        try:
             message_ids = self.upd_index(None, last_letters=50)
             message_id = random.choice(list(message_ids.keys())[:50])
             if message_ids.get(message_id, 0) != 0:
@@ -234,6 +251,10 @@ class MessageProcessor(EmailClient):
 
             res = {'mail': message_text.replace('\n', ' ')}
             return res
+        except Exception as ex:
+            self.error_processor(ex)
+            log.error(f'Critical error in process_random_id: {ex}')
+            return {}
 
 
 class MessageProcessor2(MessageProcessor):
@@ -287,28 +308,36 @@ class MessageProcessor2(MessageProcessor):
         if len(message_id) <= 1:
             return {'start_month': None, 'end_month': None, 'success': False}
         
-        log.info(f'Starting {message_id} parsing (v2)')
-        message_ids = self.upd_index(message_id, last_letters=120)
-        date_range_result = {'start_month': None, 'end_month': None, 'success': False}
-        
-        if message_ids.get(message_id, 0) != 0:
-            try:
-                data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
-                attach_texts, message_text, header_from = self.get_message_attributes(data)
-                log.info(f'Message text:\n{message_text}')
-                # Extract date range from message text
-                date_range_result = extract_date_range(message_text)
-                log.info(f'Date range extraction: {date_range_result}')
-            except Exception as ex:
-                self.error_processor(ex)
-                log.error('Email processing failed')
-                return {'start_month': None, 'end_month': None, 'success': False}
-        else:
-            log.warning(f'Message ID {message_id} not found in database')
-        
-        log.info('Parsing finished (v2)\n\n')
-        clear_folders([f'{os.getcwd()}/temp/'])
-        return date_range_result
+        try:
+            log.info(f'Starting {message_id} parsing (v2)')
+            message_ids = self.upd_index(message_id, last_letters=120)
+            date_range_result = {'start_month': None, 'end_month': None, 'success': False}
+            
+            if message_ids.get(message_id, 0) != 0:
+                try:
+                    data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
+                    attach_texts, message_text, header_from = self.get_message_attributes(data)
+                    log.info(f'Message text:\n{message_text}')
+                    # Extract date range from message text
+                    date_range_result = extract_date_range(message_text)
+                    log.info(f'Date range extraction: {date_range_result}')
+                except Exception as ex:
+                    self.error_processor(ex)
+                    log.error('Email processing failed')
+                    return {'start_month': None, 'end_month': None, 'success': False}
+            else:
+                log.warning(f'Message ID {message_id} not found in database')
+                raise MessageNotFoundError(f"Message ID {message_id} not found in database")
+            
+            log.info('Parsing finished (v2)\n\n')
+            clear_folders([f'{os.getcwd()}/temp/'])
+            return date_range_result
+        except MessageNotFoundError:
+            raise
+        except Exception as ex:
+            self.error_processor(ex)
+            log.error(f'Critical error in process_email_by_id_v2: {ex}')
+            return {'start_month': None, 'end_month': None, 'success': False}
 
     def process_all_emails_v2(self) -> list:
         """
