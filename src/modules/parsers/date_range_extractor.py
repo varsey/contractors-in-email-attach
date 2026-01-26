@@ -68,6 +68,11 @@ def extract_date_range(message: str) -> Dict[str, any]:
     if result['success']:
         return result
     
+    # 10. Russian month name: "за декабрь 2025 год", "за дек 2025"
+    result = extract_russian_month(text)
+    if result['success']:
+        return result
+    
     # No pattern matched
     return {'start_month': None, 'end_month': None, 'success': False}
 
@@ -329,5 +334,53 @@ def extract_period(text: str) -> Dict[str, any]:
                     'end_month': end_date.isoformat(),
                     'success': True
                 }
+    
+    return {'start_month': None, 'end_month': None, 'success': False}
+
+
+# Russian month names mapping (full and short forms)
+RUSSIAN_MONTHS = {
+    # Full form stems (without endings)
+    'январ': 1, 'феврал': 2, 'март': 3, 'апрел': 4, 'июн': 6,
+    'июл': 7, 'август': 8, 'сентябр': 9, 'октябр': 10, 'ноябр': 11, 'декабр': 12,
+    # Short forms
+    'янв': 1, 'фев': 2, 'мар': 3, 'апр': 4, 'май': 5, 'ма': 5, 'авг': 8,
+    'сен': 9, 'окт': 10, 'ноя': 11, 'дек': 12,
+}
+
+
+def extract_russian_month(text: str) -> Dict[str, any]:
+    """
+    Extract month from Russian month names like 'за декабрь 2025 год', 'за дек 2025'.
+    Handles both full and short forms of Russian month names.
+    """
+    # Build pattern with all month name prefixes (sorted by length descending for proper matching)
+    month_prefixes = '|'.join(sorted(RUSSIAN_MONTHS.keys(), key=len, reverse=True))
+    
+    # Pattern: optional preposition + month name + optional endings + year
+    pattern = rf'(?:за|в|на)?\s*({month_prefixes})[а-яё]*\s*(\d{{4}})\s*(?:год[ауе]*|г\.?)?'
+    
+    match = re.search(pattern, text)
+    
+    if match:
+        month_prefix = match.group(1)
+        year = int(match.group(2))
+        
+        # Find the month number by matching the prefix
+        month_num = None
+        for prefix, num in RUSSIAN_MONTHS.items():
+            if month_prefix.startswith(prefix) or prefix.startswith(month_prefix):
+                month_num = num
+                break
+        
+        if month_num and 2000 <= year <= 2100:
+            start_date = date(year, month_num, 1)
+            end_date = get_last_day_of_month(year, month_num)
+            
+            return {
+                'start_month': start_date.isoformat(),
+                'end_month': end_date.isoformat(),
+                'success': True
+            }
     
     return {'start_month': None, 'end_month': None, 'success': False}
