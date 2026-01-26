@@ -111,14 +111,48 @@ class MessageProcessor(EmailClient):
             return {'inns': list(set([x for xs in inns for x in xs if '*' not in x]))}
 
     def get_index(self, mail_id) -> str:
+        """
+        Extract Message-ID from an email by mail_id.
+        
+        First tries to fetch only the MESSAGE-ID header for efficiency.
+        If that fails (e.g., for threaded messages or malformed emails),
+        falls back to fetching the full message and parsing the Message-ID.
+        
+        Args:
+            mail_id: The IMAP mail ID to fetch
+            
+        Returns:
+            The Message-ID string (without angle brackets) or empty string if not found
+        """
+        idx = ''
+        
+        # # First attempt: fetch only the MESSAGE-ID header (efficient)
+        # try:
+        #     header_response = self.mail_connector.fetch(mail_id, '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])')
+        #     idx = ''.join((header_response[1][0][-1]
+        #         .decode('UTF-8')
+        #         .split('<')[1]
+        #         .split('>'))[:-1])
+        #     if idx:
+        #         return idx
+        # except (IndexError, TypeError, AttributeError):
+        #     pass
+        
+        # Fallback: fetch full message and parse Message-ID using email library
+        # Use BODY.PEEK[] instead of RFC822 to avoid marking the email as read
         try:
-            idx = ''.join((self.mail_connector.fetch(mail_id, '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])')[1][0][-1] # BODY.PEEK[])
-            .decode('UTF-8')
-            .split('<')[1]
-            .split('>'))[:-1])
-        except (IndexError, TypeError):
-            return ''
-
+            log.info(f'Header-only fetch failed for mail_id {mail_id}, falling back to full message fetch')
+            full_response = self.mail_connector.fetch(mail_id, '(BODY.PEEK[])')
+            if full_response[0] == 'OK' and full_response[1] and full_response[1][0]:
+                msg = message_from_bytes(full_response[1][0][1])
+                message_id = msg.get('Message-ID')
+                if message_id:
+                    # Strip angle brackets and whitespace
+                    idx = message_id.strip().strip('<>')
+                    return idx
+        except (IndexError, TypeError, AttributeError, Exception) as ex:
+            log.warning(f'Failed to extract Message-ID for mail_id {mail_id}: {ex}')
+        
         return idx
 
     def dump_messages(self, mail_ids, message_ids):
@@ -251,36 +285,6 @@ class MessageProcessor2(MessageProcessor):
                     log.warning(f'Cant find email_id at server, skipping')
         log.info(f'Saved {new_entries} new message IDs to database')
 
-    def upd_index_v2(self, message_id: Optional[str], last_letters: int = 30):
-        """
-        Update message ID index using SQLite database instead of pickle file.
-
-        Args:
-            message_id: The message ID to search for
-            last_letters: Number of last emails to check
-
-        Returns:
-            Dictionary of message_id -> mail_id mappings
-        """
-        self.setup_mail_connector()
-        last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
-        mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
-
-        # Get all existing message IDs from database
-        message_ids = self.db_client.get_all_message_ids()
-
-        if message_id in message_ids.keys():
-            log.info('Message-id found in database')
-            return message_ids
-        else:
-            log.warning('Message-id not found in database')
-
-        self.dump_messages_v2(mail_ids, message_ids)
-        # Reload message IDs after dump
-        message_ids = self.db_client.get_all_message_ids()
-
-        return message_ids
-
     def process_email_by_id_v2(self, message_id: str) -> dict:
         """
         Process email by ID using database-based caching and extract date range.
@@ -300,7 +304,7 @@ class MessageProcessor2(MessageProcessor):
             return {'start_month': None, 'end_month': None, 'success': False}
         
         log.info(f'Starting {message_id} parsing (v2)')
-        message_ids = self.upd_index_v2(message_id, last_letters=40)
+        message_ids = self.upd_index(message_id, last_letters=120)
         date_range_result = {'start_month': None, 'end_month': None, 'success': False}
         
         if message_ids.get(message_id, 0) != 0:

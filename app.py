@@ -8,8 +8,8 @@ from src.config.cfg import Config
 
 app = Flask(__name__)
 cfg = Config()
-prc = MessageProcessor(**cfg.creds, db_path = 'message_ids.db')
-prc2 = MessageProcessor2(**cfg.creds2)
+prc = MessageProcessor(**cfg.creds, db_path = 'message_ids_v1.db')
+prc2 = MessageProcessor2(**cfg.creds2, db_path = 'message_ids_v2.db')
 
 logging.getLogger('pymorphy2.opencorpora_dict.wrapper').setLevel(logging.ERROR)
 
