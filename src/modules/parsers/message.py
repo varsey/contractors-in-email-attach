@@ -1,6 +1,5 @@
 import os
 import random
-import shutil
 import imaplib
 from typing import Optional
 from email import message_from_bytes
@@ -11,26 +10,8 @@ from src.modules.parsers.attachment import AttachmentParser
 from src.modules.parsers.date_range_extractor import extract_date_range
 from src.modules.email.client import EmailClient
 from src.modules.alerter.alerter import send_email_alert
-from src.modules.minio.client import MinioClient
 from src.modules.database.client import DatabaseClient
-
-s3 = MinioClient()
-
-
-
-def clear_folders(folder_paths: list):
-    for folder_path in folder_paths:
-        for filename in os.listdir(folder_path):
-            file_path = os.path.join(folder_path, filename)
-            try:
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.unlink(file_path)
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-            except Exception as e:
-                log.error(f'Failed to delete {file_path}: {e}')
-    return None
-
+from src.modules.utils.utils import clear_folders
 
 
 class MessageNotFoundError(Exception):
@@ -39,7 +20,7 @@ class MessageNotFoundError(Exception):
 
 
 class MessageProcessor(EmailClient):
-    def __init__(self, email: str, password: str, server: str, mail_folder: str, db_path: str = 'message_ids_v1.db'):
+    def __init__(self, email: str, password: str, server: str, mail_folder: str, db_path: str = 'message_ids.db'):
         AttachmentParser.__init__(self)
         # TO-DO remove email client from here
         EmailClient.__init__(self, email, password, server, mail_folder)
@@ -277,7 +258,6 @@ class MessageProcessor2(MessageProcessor):
         """
         log.info('Dumping messages to database, please wait...')
         new_entries = 0
-        log.info('222')
         for num, mail_id in enumerate(mail_ids):
             if mail_id not in message_ids.values():
                 try:
