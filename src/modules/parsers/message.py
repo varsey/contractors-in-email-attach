@@ -63,6 +63,10 @@ class MessageProcessor(EmailClient):
 
 
     def process_email_by_id(self, message_id: str) -> dict:
+
+        message_id = message_id.strip("<>")
+        log.info(f'Updating message index for message_id: {message_id}')
+
         if len(message_id) <= 1:
             return {}
         try:
@@ -176,7 +180,6 @@ class MessageProcessor(EmailClient):
         # Get all existing message IDs from database
         message_ids = self.db_client.get_all_message_ids()
         print(f'Existing message IDs count: {len(message_ids)}')
-        print(f'Existing message IDs: {message_ids}')
 
         if message_id in message_ids.keys():
             log.info('Message-id found in database')
@@ -184,17 +187,12 @@ class MessageProcessor(EmailClient):
         else:
             log.warning('Message-id not found in database, fetching new messages')
 
-        # Dump new messages to database
         self.dump_messages(mail_ids, message_ids)
-        # Reload message IDs after dump
-        message_ids = self.db_client.get_all_message_ids()
-
 
         self.setup_mail_connector()
         last_indx = int(self.mail_connector.select(self.mail_folder)[1][0])
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
 
-        # Get all existing message IDs from database
         message_ids = self.db_client.get_all_message_ids()
 
         if message_id in message_ids.keys():
@@ -285,6 +283,10 @@ class MessageProcessor2(MessageProcessor):
                 'success': bool
             }
         """
+
+        message_id = message_id.strip("<>")
+        log.info(f'Updating message index for message_id: {message_id}')
+
         if len(message_id) <= 1:
             return {'start_month': None, 'end_month': None, 'success': False}
         
