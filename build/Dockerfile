@@ -8,6 +8,7 @@ RUN echo 'APT::Keep-Downloaded-Packages "false";' > /etc/apt/apt.conf.d/01disabl
     tesseract-ocr-script-latn unoconv &&  \
     apt-get clean
 COPY ./build/requirements.txt .
+RUN python3 -m pip install --upgrade pip setuptools
 RUN pip install --no-cache-dir --prefer-binary --upgrade -r requirements.txt
 
 WORKDIR /app
