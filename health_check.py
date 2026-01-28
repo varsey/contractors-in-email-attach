@@ -44,7 +44,7 @@ def send_email_alert():
 
 def check_server():
     try:
-        response = requests.get(SERVER_URL, timeout=30)
+        response = requests.get(SERVER_URL, timeout=60)
         if response.status_code != 200:
             print(f'Server is down! Status code: {response.status_code}')
             send_email_alert()

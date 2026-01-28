@@ -4,7 +4,14 @@ import traceback
 
 from flask import Flask, jsonify, request
 
-from src.modules.parsers.message import MessageProcessor, MessageProcessor2, MessageNotFoundError
+from src.modules.parsers.message import (
+    INNMessageProcessor, 
+    DateRangeMessageProcessor, 
+    MessageNotFoundError,
+    # Backward compatibility aliases
+    MessageProcessor, 
+    MessageProcessor2,
+)
 from src.config.cfg import Config
 from src.logger.Logger import log
 
