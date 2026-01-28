@@ -92,7 +92,7 @@ class MessageIndexManager:
         mail_folder: str,
         setup_connector_callback,
         message_id: Optional[str], 
-        last_letters: int = 30
+        last_letters: int = 120
     ) -> Dict[str, str]:
         """
         Update message ID index using SQLite database.
@@ -109,6 +109,7 @@ class MessageIndexManager:
         """
         setup_connector_callback()
         last_indx = int(mail_connector.select(mail_folder)[1][0])
+        last_letters = 0 if last_indx > last_letters else last_letters
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
 
         # Get all existing message IDs from database for this source
@@ -125,6 +126,7 @@ class MessageIndexManager:
 
         setup_connector_callback()
         last_indx = int(mail_connector.select(mail_folder)[1][0])
+        last_letters = 0 if last_indx > last_letters else last_letters
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
 
         message_ids = self.db_client.get_all_message_ids(source=self.source)

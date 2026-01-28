@@ -70,7 +70,7 @@ class BaseMessageProcessor(EmailClient, ABC):
         
         log.info(f'{self.__class__.__name__} initialized with database at {db_path}, source={source}')
     
-    def _fetch_email_data(self, message_id: str, last_letters: int = 30):
+    def _fetch_email_data(self, message_id: str, last_letters: int = 120):
         """
         Common email fetching logic.
         
@@ -98,7 +98,7 @@ class BaseMessageProcessor(EmailClient, ABC):
         data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
         return self.get_message_attributes(data)
     
-    def upd_index(self, message_id: Optional[str], last_letters: int = 30):
+    def upd_index(self, message_id: Optional[str], last_letters: int = 120):
         """
         Update message ID index - delegates to index_manager.
         
