@@ -21,16 +21,14 @@ class MessageIndexManager:
     - Updating message ID index
     """
     
-    def __init__(self, db_client: DatabaseClient, source: str = 'v1'):
+    def __init__(self, db_client: DatabaseClient):
         """
         Initialize the MessageIndexManager.
         
         Args:
             db_client: DatabaseClient instance for database operations
-            source: Source identifier for this processor ('v1' or 'v2')
         """
         self.db_client = db_client
-        self.source = source
     
     def get_index(self, mail_connector: imaplib.IMAP4_SSL, mail_id) -> str:
         """
@@ -78,7 +76,7 @@ class MessageIndexManager:
                 try:
                     indx = self.get_index(mail_connector, mail_id)
                     if len(indx) > 0 and indx not in message_ids.keys():
-                        if self.db_client.save_message_id(indx, mail_id, source=self.source):
+                        if self.db_client.save_message_id(indx, mail_id):
                             message_ids[indx] = mail_id
                             new_entries += 1
                 except imaplib.IMAP4.error:
@@ -112,8 +110,8 @@ class MessageIndexManager:
         last_letters = 0 if last_indx > last_letters else last_letters
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
 
-        # Get all existing message IDs from database for this source
-        message_ids = self.db_client.get_all_message_ids(source=self.source)
+        # Get all existing message IDs from database
+        message_ids = self.db_client.get_all_message_ids()
         print(f'Existing message IDs count: {len(message_ids)}')
 
         if message_id in message_ids.keys():
@@ -129,7 +127,7 @@ class MessageIndexManager:
         last_letters = 0 if last_indx > last_letters else last_letters
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
 
-        message_ids = self.db_client.get_all_message_ids(source=self.source)
+        message_ids = self.db_client.get_all_message_ids()
 
         if message_id in message_ids.keys():
             log.info('Message-id found in database')
@@ -140,6 +138,6 @@ class MessageIndexManager:
         self.dump_messages(mail_connector, mail_ids, message_ids)
 
         # Reload message IDs after dump
-        message_ids = self.db_client.get_all_message_ids(source=self.source)
+        message_ids = self.db_client.get_all_message_ids()
 
         return message_ids

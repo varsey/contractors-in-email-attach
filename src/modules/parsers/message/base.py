@@ -39,8 +39,7 @@ class BaseMessageProcessor(EmailClient, ABC):
         password: str, 
         server: str, 
         mail_folder: str, 
-        db_path: str = 'message_ids.db',
-        source: str = 'v1'
+        db_path: str = 'message_ids.db'
     ):
         """
         Initialize the BaseMessageProcessor.
@@ -51,24 +50,22 @@ class BaseMessageProcessor(EmailClient, ABC):
             server: IMAP server address
             mail_folder: Mail folder to process
             db_path: Path to SQLite database for message ID storage
-            source: Source identifier for this processor ('v1' or 'v2')
         """
         AttachmentParser.__init__(self)
         EmailClient.__init__(self, email, password, server, mail_folder)
         self.parsers = TextParser()
         self.mail_folder = mail_folder
-        self.source = source
         
         # Initialize database client for SQL-based message ID storage
         self.db_client = DatabaseClient(db_path=db_path)
         
         # Initialize message index manager
-        self.index_manager = MessageIndexManager(self.db_client, source=source)
+        self.index_manager = MessageIndexManager(self.db_client)
         
         # Initialize mail connector
         self.setup_mail_connector()
         
-        log.info(f'{self.__class__.__name__} initialized with database at {db_path}, source={source}')
+        log.info(f'{self.__class__.__name__} initialized with database at {db_path}')
     
     def _fetch_email_data(self, message_id: str, last_letters: int = 120):
         """

@@ -39,7 +39,7 @@ class DateRangeMessageProcessor(BaseMessageProcessor):
             mail_folder: Mail folder to process
             db_path: Path to SQLite database for message ID storage
         """
-        super().__init__(email, password, server, mail_folder, db_path, source='v2')
+        super().__init__(email, password, server, mail_folder, db_path)
     
     def parse_result(self, attach_texts: dict, message_text: str) -> dict:
         """
@@ -133,7 +133,7 @@ class DateRangeMessageProcessor(BaseMessageProcessor):
         log.info('Starting batch processing of all emails from database (v2)')
         
         # Load all message_ids from database
-        message_ids = self.db_client.get_all_message_ids(source=self.source)
+        message_ids = self.db_client.get_all_message_ids()
         log.info(f'Found {len(message_ids)} message_ids in database')
         
         results = []

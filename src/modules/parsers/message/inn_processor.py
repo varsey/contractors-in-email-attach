@@ -40,7 +40,7 @@ class INNMessageProcessor(BaseMessageProcessor):
             mail_folder: Mail folder to process
             db_path: Path to SQLite database for message ID storage
         """
-        super().__init__(email, password, server, mail_folder, db_path, source='v1')
+        super().__init__(email, password, server, mail_folder, db_path)
     
     @staticmethod
     def org_structure(inns):

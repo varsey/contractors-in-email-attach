@@ -47,21 +47,15 @@ class TestMessageIndexManager(unittest.TestCase):
     def setUp(self):
         self.db_path = 'test_index_manager.db'
         self.db_client = DatabaseClient(db_path=self.db_path)
-        self.index_manager = MessageIndexManager(self.db_client, source='v1')
+        self.index_manager = MessageIndexManager(self.db_client)
     
     def tearDown(self):
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
     
-    def test_init_with_source(self):
-        """Test MessageIndexManager initializes with correct source."""
-        self.assertEqual(self.index_manager.source, 'v1')
+    def test_init(self):
+        """Test MessageIndexManager initializes correctly."""
         self.assertEqual(self.index_manager.db_client, self.db_client)
-    
-    def test_init_with_v2_source(self):
-        """Test MessageIndexManager can be initialized with v2 source."""
-        manager = MessageIndexManager(self.db_client, source='v2')
-        self.assertEqual(manager.source, 'v2')
     
     def test_get_index_with_mock_connector(self):
         """Test get_index extracts Message-ID from email."""
