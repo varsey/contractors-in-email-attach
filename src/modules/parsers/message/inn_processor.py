@@ -9,6 +9,7 @@ import random
 from src.logger.Logger import log
 from src.modules.alerter.alerter import send_email_alert
 from src.modules.utils.utils import clear_folders
+from src.config.cfg import LAST_MESSAGES
 
 from .base import BaseMessageProcessor
 from .exceptions import MessageNotFoundError
@@ -174,7 +175,7 @@ class INNMessageProcessor(BaseMessageProcessor):
             Dictionary with 'mail' key containing the message text
         """
         try:
-            message_ids = self.upd_index(None, last_letters=120)
+            message_ids = self.upd_index(None, last_letters=LAST_MESSAGES)
             message_id = random.choice(list(message_ids.keys())[:50])
             
             if message_ids.get(message_id, 0) != 0:

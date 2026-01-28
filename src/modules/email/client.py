@@ -22,6 +22,7 @@ class EmailClient(AttachmentParser):
             self.sel = self.mail_connector.select(self.mail_folder) # mail_connector.list()[1] - list of folders in mailbox
         except Exception as e:
             log.error(f'Cannot connect, check connection params {e}')
+            raise
         return self.mail_connector
 
     def get_message_attributes(self, data) -> (dict, str, str):

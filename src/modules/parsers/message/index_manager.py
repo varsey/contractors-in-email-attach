@@ -1,14 +1,10 @@
-"""
-Message Index Manager - handles message index operations.
-
-Extracted from MessageProcessor to follow Single Responsibility Principle.
-"""
 import imaplib
 from typing import Optional, Dict
 from email import message_from_bytes
 
 from src.logger.Logger import log
 from src.modules.database.client import DatabaseClient
+from src.config.cfg import LAST_MESSAGES
 
 
 class MessageIndexManager:
@@ -90,7 +86,7 @@ class MessageIndexManager:
         mail_folder: str,
         setup_connector_callback,
         message_id: Optional[str], 
-        last_letters: int = 120
+        last_letters: int = LAST_MESSAGES
     ) -> Dict[str, str]:
         """
         Update message ID index using SQLite database.
@@ -100,17 +96,16 @@ class MessageIndexManager:
             mail_folder: Mail folder name
             setup_connector_callback: Callback to setup mail connector
             message_id: The message ID to search for
-            last_letters: Number of last emails to check
+            last_letters: Number of last emails to check (capped to available messages)
 
         Returns:
             Dictionary of message_id -> mail_id mappings
         """
         setup_connector_callback()
         last_indx = int(mail_connector.select(mail_folder)[1][0])
-        last_letters = 0 if last_indx > last_letters else last_letters
+        last_letters = min(last_letters, last_indx)
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
 
-        # Get all existing message IDs from database
         message_ids = self.db_client.get_all_message_ids()
         print(f'Existing message IDs count: {len(message_ids)}')
 
@@ -124,7 +119,7 @@ class MessageIndexManager:
 
         setup_connector_callback()
         last_indx = int(mail_connector.select(mail_folder)[1][0])
-        last_letters = 0 if last_indx > last_letters else last_letters
+        last_letters = min(last_letters, last_indx)
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
 
         message_ids = self.db_client.get_all_message_ids()
@@ -137,7 +132,6 @@ class MessageIndexManager:
 
         self.dump_messages(mail_connector, mail_ids, message_ids)
 
-        # Reload message IDs after dump
         message_ids = self.db_client.get_all_message_ids()
 
         return message_ids

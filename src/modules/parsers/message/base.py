@@ -13,6 +13,7 @@ from src.modules.parsers.attachment import AttachmentParser
 from src.modules.email.client import EmailClient
 from src.modules.database.client import DatabaseClient
 from src.modules.utils.utils import clear_folders
+from src.config.cfg import LAST_MESSAGES
 
 from .index_manager import MessageIndexManager
 from .exceptions import MessageNotFoundError
@@ -67,7 +68,7 @@ class BaseMessageProcessor(EmailClient, ABC):
         
         log.info(f'{self.__class__.__name__} initialized with database at {db_path}')
     
-    def _fetch_email_data(self, message_id: str, last_letters: int = 120):
+    def _fetch_email_data(self, message_id: str, last_letters: int = LAST_MESSAGES):
         """
         Common email fetching logic.
         
@@ -95,7 +96,7 @@ class BaseMessageProcessor(EmailClient, ABC):
         data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
         return self.get_message_attributes(data)
     
-    def upd_index(self, message_id: Optional[str], last_letters: int = 120):
+    def upd_index(self, message_id: Optional[str], last_letters: int = LAST_MESSAGES):
         """
         Update message ID index - delegates to index_manager.
         

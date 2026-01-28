@@ -2,6 +2,7 @@ import os
 
 
 MAIL_FOLDER = 'inbox'
+LAST_MESSAGES = 120  # Number of last emails to check in index update
 email, password, server = os.getenv("EMAIL"), os.getenv('PASS'), os.getenv('SERVER')
 
 
