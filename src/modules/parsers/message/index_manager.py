@@ -1,5 +1,5 @@
 import imaplib
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from src.logger.Logger import log
 from src.modules.database.client import DatabaseClient
@@ -39,7 +39,6 @@ class MessageIndexManager:
         idx = ''
         
         try:
-            print(f'{mail_id=}')
             # Fetch only the Message-ID header instead of the entire email for better performance
             response = mail_connector.fetch(mail_id, '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])')
             if response[0] == 'OK' and response[1] and response[1][0]:
@@ -56,31 +55,133 @@ class MessageIndexManager:
         
         return idx
     
-    def dump_messages(self, mail_connector: imaplib.IMAP4_SSL, mail_ids, message_ids: Dict[str, str]) -> Dict[str, str]:
+    def get_index_batch(self, mail_connector: imaplib.IMAP4_SSL, mail_ids: List[bytes]) -> Dict[str, str]:
         """
-        Save message IDs to SQLite database.
+        Extract Message-IDs from multiple emails in a single IMAP command (batch fetching).
+        
+        This is more efficient than calling get_index() for each mail_id individually,
+        as it reduces IMAP round-trips.
+        
+        Args:
+            mail_connector: IMAP connection object
+            mail_ids: List of IMAP mail IDs to fetch (as bytes)
+            
+        Returns:
+            Dictionary mapping mail_id (as string) to Message-ID string
+        """
+        result = {}
+        
+        if not mail_ids:
+            return result
+        
+        try:
+            # Build comma-separated list of mail IDs for batch fetch
+            mail_ids_str = ','.join([mid.decode() if isinstance(mid, bytes) else str(mid) for mid in mail_ids])
+            print(f'{mail_ids_str=}')
+            # Fetch Message-ID headers for all messages in a single IMAP command
+            response = mail_connector.fetch(mail_ids_str, '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])')
+            
+            if response[0] != 'OK':
+                log.warning(f'Batch fetch failed with status: {response[0]}')
+                return result
+            
+            # Parse batch response - it contains tuples for each message
+            current_mail_id = None
+            for item in response[1]:
+                if item is None:
+                    continue
+                    
+                if isinstance(item, tuple):
+                    # First element contains the mail ID info, second contains the header data
+                    # Format: (b'123 (BODY[HEADER.FIELDS (MESSAGE-ID)] {XX}', b'Message-ID: <...>\r\n')
+                    if len(item) >= 2:
+                        # Extract mail_id from the first part
+                        first_part = item[0]
+                        if isinstance(first_part, bytes):
+                            first_part = first_part.decode('utf-8', errors='ignore')
+                        # Parse mail_id from format like "123 (BODY..."
+                        mail_id_part = first_part.split()[0] if first_part else None
+                        
+                        # Extract Message-ID from header data
+                        header_data = item[1]
+                        if isinstance(header_data, bytes):
+                            header_data = header_data.decode('utf-8', errors='ignore')
+                        
+                        message_id = ''
+                        for line in header_data.split('\n'):
+                            if line.lower().startswith('message-id:'):
+                                message_id = line.split(':', 1)[1].strip().strip('<>')
+                                break
+                        
+                        if mail_id_part and message_id:
+                            result[mail_id_part] = message_id
+                            
+        except (IndexError, TypeError, AttributeError, Exception) as ex:
+            log.warning(f'Batch fetch failed: {ex}')
+        
+        return result
+    
+    def dump_messages(self, mail_connector: imaplib.IMAP4_SSL, mail_ids, message_ids: Dict[str, str], batch_size: int = None) -> Dict[str, str]:
+        """
+        Save message IDs to SQLite database using batch fetching for better performance.
 
         Args:
             mail_connector: IMAP connection object
             mail_ids: List of mail IDs to process
             message_ids: Dictionary of existing message_id -> mail_id mappings
+            batch_size: Number of messages to fetch per IMAP command (default: 1/5 of total mail_ids)
         
         Returns:
             Updated dictionary of message_id -> mail_id mappings
         """
         log.info('Dumping messages to database, please wait...')
-        new_entries = 0
-        for num, mail_id in enumerate(mail_ids):
-            if mail_id not in message_ids.values():
-                try:
-                    indx = self.get_index(mail_connector, mail_id)
-                    if len(indx) > 0 and indx not in message_ids.keys():
-                        if self.db_client.save_message_id(indx, mail_id):
-                            message_ids[indx] = mail_id
-                            new_entries += 1
-                except imaplib.IMAP4.error:
-                    log.warning(f'Cannot find email_id at server, skipping')
-        log.info(f'Saved {new_entries} new message IDs to database')
+        
+        # Filter out mail_ids that are already in the database
+        existing_mail_ids = set(message_ids.values())
+        mail_ids_to_fetch = [mid for mid in mail_ids if mid not in existing_mail_ids]
+        
+        if not mail_ids_to_fetch:
+            log.info('No new messages to fetch')
+            return message_ids
+        
+        # Calculate batch_size if not provided (default: 1/5 of total mail_ids, minimum 1)
+        if batch_size is None:
+            batch_size = max(1, len(mail_ids_to_fetch) // 5)
+        
+        total_saved = 0
+        
+        # Process mail_ids in batches
+        for i in range(0, len(mail_ids_to_fetch), batch_size):
+            batch = mail_ids_to_fetch[i:i + batch_size]
+            
+            try:
+                # Batch fetch Message-IDs for current batch
+                batch_results = self.get_index_batch(mail_connector, batch)
+                
+                # Prepare new entries for batch save
+                new_entries = {}
+                for mail_id_str, msg_id in batch_results.items():
+                    if msg_id and msg_id not in message_ids.keys():
+                        # Convert mail_id back to bytes format for consistency
+                        mail_id_bytes = mail_id_str.encode() if isinstance(mail_id_str, str) else mail_id_str
+                        new_entries[msg_id] = mail_id_bytes
+                
+                # Batch save to database
+                if new_entries:
+                    saved_count = self.db_client.save_multiple_message_ids(new_entries)
+                    message_ids.update(new_entries)
+                    total_saved += saved_count
+                    
+            except imaplib.IMAP4.error as ex:
+                log.warning(f'IMAP error during batch fetch: {ex}')
+            except Exception as ex:
+                log.warning(f'Error during batch message dump: {ex}')
+        
+        if total_saved > 0:
+            log.info(f'Saved {total_saved} new message IDs to database')
+        else:
+            log.info('No new unique message IDs to save')
+        
         return message_ids
     
     def upd_index(
@@ -108,7 +209,10 @@ class MessageIndexManager:
         mail_connector = setup_connector_callback()
         last_indx = int(mail_connector.select(mail_folder)[1][0])
         last_letters = min(last_letters, last_indx)
-        mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
+        mail_ids = [str(x).encode() for x in range(max(1, last_indx - last_letters), last_indx + 1)]
+        
+        # Tests show better performance without batches completely
+        batch_size = last_letters # max(1, last_letters // 2)
 
         message_ids = self.db_client.get_all_message_ids()
         print(f'Existing message IDs count: {len(message_ids)}')
@@ -119,13 +223,13 @@ class MessageIndexManager:
         else:
             log.warning('Message-id not found in database, fetching new messages')
 
-        self.dump_messages(mail_connector, mail_ids, message_ids)
+        self.dump_messages(mail_connector, mail_ids, message_ids, batch_size=batch_size)
 
         # Refresh connection for second pass
         mail_connector = setup_connector_callback()
         last_indx = int(mail_connector.select(mail_folder)[1][0])
         last_letters = min(last_letters, last_indx)
-        mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
+        mail_ids = [str(x).encode() for x in range(max(1, last_indx - last_letters), last_indx + 1)]
 
         message_ids = self.db_client.get_all_message_ids()
 
@@ -135,7 +239,7 @@ class MessageIndexManager:
         else:
             log.warning('Message-id not found in database')
 
-        self.dump_messages(mail_connector, mail_ids, message_ids)
+        self.dump_messages(mail_connector, mail_ids, message_ids, batch_size=batch_size)
 
         message_ids = self.db_client.get_all_message_ids()
 
