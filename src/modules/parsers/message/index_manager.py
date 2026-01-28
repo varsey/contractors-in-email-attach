@@ -1,6 +1,5 @@
 import imaplib
 from typing import Optional, Dict
-from email import message_from_bytes
 
 from src.logger.Logger import log
 from src.modules.database.client import DatabaseClient
@@ -41,13 +40,17 @@ class MessageIndexManager:
         
         try:
             print(f'{mail_id=}')
-            full_response = mail_connector.fetch(mail_id, '(BODY.PEEK[])')
-            if full_response[0] == 'OK' and full_response[1] and full_response[1][0]:
-                msg = message_from_bytes(full_response[1][0][1])
-                message_id = msg.get('Message-ID')
-                if message_id:
-                    idx = message_id.strip().strip('<>')
-                    return idx
+            # Fetch only the Message-ID header instead of the entire email for better performance
+            response = mail_connector.fetch(mail_id, '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])')
+            if response[0] == 'OK' and response[1] and response[1][0]:
+                header_data = response[1][0][1]
+                if isinstance(header_data, bytes):
+                    header_data = header_data.decode('utf-8', errors='ignore')
+                # Parse Message-ID from header
+                for line in header_data.split('\n'):
+                    if line.lower().startswith('message-id:'):
+                        idx = line.split(':', 1)[1].strip().strip('<>')
+                        break
         except (IndexError, TypeError, AttributeError, Exception) as ex:
             log.warning(f'Failed to extract Message-ID for mail_id {mail_id}: {ex}')
         
@@ -101,7 +104,8 @@ class MessageIndexManager:
         Returns:
             Dictionary of message_id -> mail_id mappings
         """
-        setup_connector_callback()
+        # Use the connection returned by callback to ensure we have a fresh connection
+        mail_connector = setup_connector_callback()
         last_indx = int(mail_connector.select(mail_folder)[1][0])
         last_letters = min(last_letters, last_indx)
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
@@ -117,7 +121,8 @@ class MessageIndexManager:
 
         self.dump_messages(mail_connector, mail_ids, message_ids)
 
-        setup_connector_callback()
+        # Refresh connection for second pass
+        mail_connector = setup_connector_callback()
         last_indx = int(mail_connector.select(mail_folder)[1][0])
         last_letters = min(last_letters, last_indx)
         mail_ids = [str(x).encode() for x in range(last_indx - last_letters, last_indx + 1)]
