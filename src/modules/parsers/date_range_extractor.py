@@ -73,6 +73,11 @@ def extract_date_range(message: str) -> Dict[str, any]:
     if result['success']:
         return result
     
+    # 11. Low-priority: "акт сверки за {year}" or "акт за {year}" without "год" suffix
+    result = extract_akt_sverki_year(text)
+    if result['success']:
+        return result
+    
     # No pattern matched
     return {'start_month': None, 'end_month': None, 'success': False}
 
@@ -376,6 +381,57 @@ def extract_russian_month(text: str) -> Dict[str, any]:
         if month_num and 2000 <= year <= 2100:
             start_date = date(year, month_num, 1)
             end_date = get_last_day_of_month(year, month_num)
+            
+            return {
+                'start_month': start_date.isoformat(),
+                'end_month': end_date.isoformat(),
+                'success': True
+            }
+    
+    return {'start_month': None, 'end_month': None, 'success': False}
+
+
+def extract_akt_sverki_year(text: str) -> Dict[str, any]:
+    """
+    Low-priority extraction for patterns like 'акт сверки за 2025' or 'акт за 2025'.
+    Handles cases without 'год', 'г', or 'гг' suffix.
+    Year must be > 2020. If year is not found, defaults to current year.
+    """
+    # Patterns: "акт сверки за {year}" or "акт за {year}" 
+    # Year can be followed by optional word boundary or end, but NOT by "год/г/гг"
+    # We need to avoid matching cases already handled by extract_year
+    patterns = [
+        r'акт[а-яё]*\s+сверки\s+за\s+(\d{4})(?!\s*(?:год|г\.|г\b|гг))',
+        r'акт[а-яё]*\s+за\s+(\d{4})(?!\s*(?:год|г\.|г\b|гг))',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            year = int(match.group(1))
+            
+            # Year must be > 2020 and reasonable
+            if 2021 <= year <= 2100:
+                start_date = date(year, 1, 1)
+                end_date = date(year, 12, 31)
+                
+                return {
+                    'start_month': start_date.isoformat(),
+                    'end_month': end_date.isoformat(),
+                    'success': True
+                }
+    
+    # If pattern "акт сверки за" or "акт за" exists but no valid year, use current year
+    fallback_patterns = [
+        r'акт[а-яё]*\s+сверки\s+за\b',
+        r'акт[а-яё]*\s+за\b',
+    ]
+    
+    for pattern in fallback_patterns:
+        if re.search(pattern, text):
+            current_year = datetime.now().year
+            start_date = date(current_year, 1, 1)
+            end_date = date(current_year, 12, 31)
             
             return {
                 'start_month': start_date.isoformat(),
