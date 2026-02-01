@@ -1,4 +1,5 @@
 import imaplib
+import time
 from typing import Optional, Dict, List
 
 from src.logger.Logger import log
@@ -24,6 +25,15 @@ class MessageIndexManager:
             db_client: DatabaseClient instance for database operations
         """
         self.db_client = db_client
+    
+    @staticmethod
+    def is_connection_alive(mail_connector) -> bool:
+        """Check if IMAP connection is still alive without changing state."""
+        try:
+            status, _ = mail_connector.noop()
+            return status == 'OK'
+        except:
+            return False
     
     def get_index(self, mail_connector: imaplib.IMAP4_SSL, mail_id) -> str:
         """
@@ -121,7 +131,15 @@ class MessageIndexManager:
         
         return result
     
-    def dump_messages(self, mail_connector: imaplib.IMAP4_SSL, mail_ids, message_ids: Dict[str, str], batch_size: int = None) -> Dict[str, str]:
+    def dump_messages(
+        self, 
+        mail_connector: imaplib.IMAP4_SSL, 
+        mail_ids, 
+        message_ids: Dict[str, str], 
+        batch_size: int = None,
+        setup_connector_callback = None,
+        max_retries: int = 2
+    ) -> Dict[str, str]:
         """
         Save message IDs to SQLite database using batch fetching for better performance.
 
@@ -130,6 +148,8 @@ class MessageIndexManager:
             mail_ids: List of mail IDs to process
             message_ids: Dictionary of existing message_id -> mail_id mappings
             batch_size: Number of messages to fetch per IMAP command (default: 1/5 of total mail_ids)
+            setup_connector_callback: Callback to reinitialize connection if needed
+            max_retries: Maximum retry attempts for failed batch operations
         
         Returns:
             Updated dictionary of message_id -> mail_id mappings
@@ -146,7 +166,7 @@ class MessageIndexManager:
         
         # Calculate batch_size if not provided (default: 1/5 of total mail_ids, minimum 1)
         if batch_size is None:
-            batch_size = max(1, len(mail_ids_to_fetch) // 5)
+            batch_size = max(1, len(mail_ids_to_fetch) // 10)
         
         total_saved = 0
         
@@ -154,28 +174,56 @@ class MessageIndexManager:
         for i in range(0, len(mail_ids_to_fetch), batch_size):
             batch = mail_ids_to_fetch[i:i + batch_size]
             
-            try:
-                # Batch fetch Message-IDs for current batch
-                batch_results = self.get_index_batch(mail_connector, batch)
-                
-                # Prepare new entries for batch save
-                new_entries = {}
-                for mail_id_str, msg_id in batch_results.items():
-                    if msg_id and msg_id not in message_ids.keys():
-                        # Convert mail_id back to bytes format for consistency
-                        mail_id_bytes = mail_id_str.encode() if isinstance(mail_id_str, str) else mail_id_str
-                        new_entries[msg_id] = mail_id_bytes
-                
-                # Batch save to database
-                if new_entries:
-                    saved_count = self.db_client.save_multiple_message_ids(new_entries)
-                    message_ids.update(new_entries)
-                    total_saved += saved_count
+            for attempt in range(max_retries):
+                try:
+                    # Validate connection before operation
+                    if not self.is_connection_alive(mail_connector):
+                        log.warning('Connection not alive, attempting to reconnect')
+                        if setup_connector_callback:
+                            mail_connector = setup_connector_callback()
+                        else:
+                            raise imaplib.IMAP4.error("Connection lost and no callback provided")
                     
-            except imaplib.IMAP4.error as ex:
-                log.warning(f'IMAP error during batch fetch: {ex}')
-            except Exception as ex:
-                log.warning(f'Error during batch message dump: {ex}')
+                    # Batch fetch Message-IDs for current batch
+                    batch_results = self.get_index_batch(mail_connector, batch)
+                    
+                    # Prepare new entries for batch save
+                    new_entries = {}
+                    for mail_id_str, msg_id in batch_results.items():
+                        if msg_id and msg_id not in message_ids.keys():
+                            # Convert mail_id back to bytes format for consistency
+                            mail_id_bytes = mail_id_str.encode() if isinstance(mail_id_str, str) else mail_id_str
+                            new_entries[msg_id] = mail_id_bytes
+                    
+                    # Batch save to database
+                    if new_entries:
+                        saved_count = self.db_client.save_multiple_message_ids(new_entries)
+                        message_ids.update(new_entries)
+                        total_saved += saved_count
+                    
+                    break  # Success, exit retry loop
+                    
+                except (imaplib.IMAP4.error, ConnectionResetError, OSError) as ex:
+                    if attempt == max_retries - 1:
+                        log.error(f'Batch fetch failed after {max_retries} attempts: {ex}')
+                        # Try to reinitialize connection for next batch if callback provided
+                        if setup_connector_callback:
+                            try:
+                                mail_connector = setup_connector_callback()
+                            except Exception as reconnect_ex:
+                                log.error(f'Failed to reconnect: {reconnect_ex}')
+                    else:
+                        log.warning(f'Batch fetch failed (attempt {attempt + 1}), retrying: {ex}')
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                        # Try to reconnect before next attempt
+                        if setup_connector_callback:
+                            try:
+                                mail_connector = setup_connector_callback()
+                            except Exception as reconnect_ex:
+                                log.warning(f'Reconnect attempt failed: {reconnect_ex}')
+                except Exception as ex:
+                    log.warning(f'Error during batch message dump: {ex}')
+                    break  # Non-retryable error
         
         if total_saved > 0:
             log.info(f'Saved {total_saved} new message IDs to database')
@@ -223,7 +271,7 @@ class MessageIndexManager:
         else:
             log.warning('Message-id not found in database, fetching new messages')
 
-        self.dump_messages(mail_connector, mail_ids, message_ids, batch_size=batch_size)
+        self.dump_messages(mail_connector, mail_ids, message_ids, batch_size=batch_size, setup_connector_callback=setup_connector_callback)
 
         # Refresh connection for second pass
         mail_connector = setup_connector_callback()
@@ -239,7 +287,7 @@ class MessageIndexManager:
         else:
             log.warning('Message-id not found in database')
 
-        self.dump_messages(mail_connector, mail_ids, message_ids, batch_size=batch_size)
+        self.dump_messages(mail_connector, mail_ids, message_ids, batch_size=batch_size, setup_connector_callback=setup_connector_callback)
 
         message_ids = self.db_client.get_all_message_ids()
 

@@ -11,3 +11,8 @@ class MessageNotFoundError(Exception):
 class MessageProcessingError(Exception):
     """Exception raised when message processing fails."""
     pass
+
+
+class NetworkError(Exception):
+    """Exception raised when network/connection operations fail."""
+    pass

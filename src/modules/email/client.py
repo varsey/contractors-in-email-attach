@@ -1,10 +1,32 @@
 import os
 import imaplib
+import time
+import random
+from functools import wraps
 
 import eml_parser
 
 from src.logger.Logger import log
 from src.modules.parsers.attachment import AttachmentParser
+
+
+def retry_with_backoff(max_retries=3, base_delay=1, max_delay=30):
+    """Decorator for retrying operations with exponential backoff."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except (ConnectionResetError, imaplib.IMAP4.error, OSError) as e:
+                    if attempt == max_retries - 1:
+                        raise
+                    delay = min(base_delay * (2 ** attempt) + random.uniform(0, 1), max_delay)
+                    log.warning(f'Connection failed (attempt {attempt + 1}/{max_retries}), retrying in {delay:.1f}s: {e}')
+                    time.sleep(delay)
+            return None
+        return wrapper
+    return decorator
 
 
 class EmailClient(AttachmentParser):
@@ -15,15 +37,26 @@ class EmailClient(AttachmentParser):
         self.server = server
         self.mail_folder = mail_folder
 
+    @retry_with_backoff(max_retries=3, base_delay=2)
     def setup_mail_connector(self):
         try:
             self.mail_connector = imaplib.IMAP4_SSL(self.server)
             self.mail_connector.login(self.email, self.password)
-            self.sel = self.mail_connector.select(self.mail_folder) # mail_connector.list()[1] - list of folders in mailbox
+            self.sel = self.mail_connector.select(self.mail_folder)
+            log.info('IMAP connection established successfully')
         except Exception as e:
             log.error(f'Cannot connect, check connection params {e}')
             raise
         return self.mail_connector
+
+    @staticmethod
+    def is_connection_alive(mail_connector) -> bool:
+        """Check if IMAP connection is still alive without changing state."""
+        try:
+            status, _ = mail_connector.noop()
+            return status == 'OK'
+        except:
+            return False
 
     def get_message_attributes(self, data) -> (dict, str, str):
 

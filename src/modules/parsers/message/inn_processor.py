@@ -3,6 +3,7 @@ INN Message Processor - extracts INN (tax identification numbers) from emails.
 
 Serves the /api/parsing/ endpoint.
 """
+import imaplib
 import os
 import random
 
@@ -12,7 +13,7 @@ from src.modules.utils.utils import clear_folders
 from src.config.cfg import LAST_MESSAGES
 
 from .base import BaseMessageProcessor
-from .exceptions import MessageNotFoundError
+from .exceptions import MessageNotFoundError, NetworkError
 
 
 class INNMessageProcessor(BaseMessageProcessor):
@@ -119,6 +120,7 @@ class INNMessageProcessor(BaseMessageProcessor):
             
         Raises:
             MessageNotFoundError: If the message ID is not found
+            NetworkError: If connection to mail server fails
         """
         message_id = message_id.strip("<>")
         log.info(f'Updating message index for message_id: {message_id}')
@@ -160,6 +162,9 @@ class INNMessageProcessor(BaseMessageProcessor):
             inns = [x['inn'] for x in orgs_dict.values()]
             return {'inns': list(set([x for xs in inns for x in xs if '*' not in x]))}
         
+        except (ConnectionResetError, imaplib.IMAP4.error, OSError) as e:
+            log.error(f'Network error while processing message {message_id}: {e}')
+            raise NetworkError(f"Failed to connect to mail server: {e}") from e
         except MessageNotFoundError:
             raise
         except Exception as ex:
@@ -194,6 +199,9 @@ class INNMessageProcessor(BaseMessageProcessor):
 
             res = {'mail': message_text.replace('\n', ' ')}
             return res
+        except (ConnectionResetError, imaplib.IMAP4.error, OSError) as e:
+            log.error(f'Network error in process_random_id: {e}')
+            raise NetworkError(f"Failed to connect to mail server: {e}") from e
         except Exception as ex:
             self.error_processor(ex)
             log.error(f'Critical error in process_random_id: {ex}')
