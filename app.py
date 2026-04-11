@@ -19,7 +19,7 @@ from src.logger.Logger import log
 app = Flask(__name__)
 cfg = Config()
 prc = MessageProcessor(**cfg.creds, db_path = 'message_ids.db')
-prc2 = MessageProcessor2(**cfg.creds2, db_path = 'message_ids.db')
+prc2 = MessageProcessor2(**cfg.creds2, db_path = 'message_ids2.db')
 
 logging.getLogger('pymorphy2.opencorpora_dict.wrapper').setLevel(logging.ERROR)
 

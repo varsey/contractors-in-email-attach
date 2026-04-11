@@ -81,6 +81,18 @@ class TestDatabaseClient(unittest.TestCase):
         all_ids = self.client.get_all_message_ids()
         self.assertEqual(all_ids, {"id-1": "1"})
 
+    def test_get_message_ids_by_mail_ids_returns_subset(self):
+        self.client.save_multiple_message_ids(
+            {
+                "msg_a": "1",
+                "msg_b": "2",
+                "msg_c": "3",
+            }
+        )
+
+        subset = self.client.get_message_ids_by_mail_ids([b"1", "3", "999"])
+        self.assertEqual(subset, {"msg_a": "1", "msg_c": "3"})
+
 
 if __name__ == '__main__':
     unittest.main()

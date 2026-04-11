@@ -85,6 +85,7 @@ class MessageIndexManager:
             # Build comma-separated list of mail IDs for batch fetch
             mail_ids_str = ','.join([mid.decode() if isinstance(mid, bytes) else str(mid) for mid in mail_ids])
             print(f'{mail_ids_str=}')
+            print(f'{mail_ids_str=}')
             # Fetch Message-ID headers for all messages in a single IMAP command
             response = mail_connector.fetch(mail_ids_str, '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])')
             
@@ -149,8 +150,9 @@ class MessageIndexManager:
         """
         log.info('Dumping messages to database, please wait...')
         
-        # Filter out mail_ids that are already in the database
+        # Filter out mail_ids that are already in the provided mapping snapshot
         existing_mail_ids = set(message_ids.values())
+        print(f'{mail_ids=}')
         mail_ids_to_fetch = [
             mid
             for mid in mail_ids
@@ -187,8 +189,9 @@ class MessageIndexManager:
                     # Prepare new entries for batch save
                     new_entries = {}
                     for mail_id_str, msg_id in batch_results.items():
+                        print(mail_id_str, msg_id)
                         normalized_msg_id = normalize_message_id(msg_id)
-                        if normalized_msg_id and normalized_msg_id not in message_ids.keys():
+                        if normalized_msg_id and normalized_msg_id not in message_ids:
                             new_entries[normalized_msg_id] = str(mail_id_str)
                     
                     # Batch save to database
@@ -249,44 +252,37 @@ class MessageIndexManager:
         Returns:
             Dictionary of message_id -> mail_id mappings
         """
+        normalized_message_id = normalize_message_id(message_id)
+        if normalized_message_id and self.db_client.check_if_exists(normalized_message_id):
+            log.info('Message-id found in database')
+            return self.db_client.get_all_message_ids()
+
+        if normalized_message_id:
+            log.warning('Message-id not found in database, fetching new messages')
+
         # Use the connection returned by callback to ensure we have a fresh connection
         mail_connector = setup_connector_callback()
         last_indx = int(mail_connector.select(mail_folder)[1][0])
         last_letters = min(last_letters, last_indx)
         mail_ids = [str(x).encode() for x in range(max(1, last_indx - last_letters), last_indx + 1)]
-        
-        # Tests show better performance without batches completely
-        batch_size = last_letters # max(1, last_letters // 2)
+        batch_size = last_letters
 
-        message_ids = self.db_client.get_all_message_ids()
-        print(f'Existing message IDs count: {len(message_ids)}')
+        message_ids = self.db_client.get_message_ids_by_mail_ids(mail_ids)
+        print(f'{message_ids=}')
 
-        normalized_message_id = normalize_message_id(message_id)
-
-        if normalized_message_id in message_ids.keys():
+        if normalized_message_id and normalized_message_id in message_ids:
             log.info('Message-id found in database')
             return message_ids
-        else:
-            log.warning('Message-id not found in database, fetching new messages')
-
-        self.dump_messages(mail_connector, mail_ids, message_ids, batch_size=batch_size, setup_connector_callback=setup_connector_callback)
-
-        # Refresh connection for second pass
-        mail_connector = setup_connector_callback()
-        last_indx = int(mail_connector.select(mail_folder)[1][0])
-        last_letters = min(last_letters, last_indx)
-        mail_ids = [str(x).encode() for x in range(max(1, last_indx - last_letters), last_indx + 1)]
-
-        message_ids = self.db_client.get_all_message_ids()
-
-        if normalized_message_id in message_ids.keys():
-            log.info('Message-id found in database')
-            return message_ids
-        else:
+        if normalized_message_id:
             log.warning('Message-id not found in database')
 
-        self.dump_messages(mail_connector, mail_ids, message_ids, batch_size=batch_size, setup_connector_callback=setup_connector_callback)
+        self.dump_messages(
+            mail_connector, mail_ids, message_ids, batch_size=batch_size,
+            setup_connector_callback=setup_connector_callback
+        )
+        refreshed_message_ids = self.db_client.get_message_ids_by_mail_ids(mail_ids)
 
-        message_ids = self.db_client.get_all_message_ids()
+        if normalized_message_id and normalized_message_id not in refreshed_message_ids:
+            log.warning('Message-id not found in indexed window after refresh')
 
-        return message_ids
+        return refreshed_message_ids

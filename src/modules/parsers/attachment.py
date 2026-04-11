@@ -2,6 +2,7 @@ import os
 import csv
 import base64
 import traceback
+from typing import Optional, Set
 
 import PyPDF2
 # I wouldn't suggest using PyFPDF, as it is outdated and no longer being maintained.
@@ -49,26 +50,29 @@ class AttachmentParser:
         except KeyError:
             return ''
 
-        full_text = ''
+        full_text_parts = []
         if document is not None and len(document.tables) > 0:
             for table_count, _ in enumerate(document.tables):
                 table = document.tables[table_count]
-                for i, row in enumerate(table.rows):
+                for row in table.rows:
                     text = [cell.text + '\n' for cell in row.cells if len(cell.text) > 2]
-                    full_text += '\n '.join(text)
+                    if text:
+                        full_text_parts.append('\n '.join(text))
 
             paragraphs = []
-            for num, para in enumerate(document.paragraphs):
+            for para in document.paragraphs:
                 paragraphs.append(para.text)
-            full_text += ' '.join(paragraphs)
+            if paragraphs:
+                full_text_parts.append(' '.join(paragraphs))
+
+        full_text = ' '.join(full_text_parts)
 
         if len(full_text) == 0:
-            extracted_list = []
+            extracted_set = set()
             for x in docx2txt.process(''.join(attachment_path.split('.')[:-1]) + self.docx_ext).split():
-                if x not in extracted_list:
-                    extracted_list.append(x)
+                extracted_set.add(x)
 
-            return ' '.join(extracted_list)
+            return ' '.join(extracted_set)
 
         return full_text
 
@@ -91,14 +95,10 @@ class AttachmentParser:
             except Image.DecompressionBombError:
                 pdf_pages = []
 
-            image_file_list = []
             for page_enumeration, page in enumerate(pdf_pages, start=1):
-                filename = f"{self.tmp_fldr}/page_{page_enumeration:04}.jpg"
-                page.save(filename, "JPEG")
-                image_file_list.append(filename)
-
-            for image_file in image_file_list:
-                full_text = pytesseract.image_to_string(Image.open(image_file), lang="rus")
+                image_file = f"{self.tmp_fldr}/page_{page_enumeration:04}.jpg"
+                page.save(image_file, "JPEG")
+                full_text += ' ' + pytesseract.image_to_string(Image.open(image_file), lang="rus")
 
         return full_text
 
@@ -112,7 +112,7 @@ class AttachmentParser:
                 full_text += ' ' + ' '.join(row)
         return full_text
 
-    def save_attachments_files(self, parsed_eml) -> list:
+    def save_attachments_files(self, parsed_eml, decode_data: bool = True, allowed_names: Optional[Set[str]] = None) -> list:
         log.info(parsed_eml['header']['subject'])
         log.info(parsed_eml['header']['from'])
 
@@ -123,9 +123,14 @@ class AttachmentParser:
                 attach_name = parsed_eml['attachment'][attach_count]['filename']
                 attach_name = f'{attach_name.replace(".", "")[:40]}.{attach_name.split(".")[-1].lower()}'
                 if self.attach_extention_check(attach_name) and self.attach_name_check(attach_name):
-                    f = open(f'{self.tmp_fldr}/{attach_name}', 'wb+')
-                    f.write(base64.b64decode(parsed_eml['attachment'][attach_count]['raw']))
-                    f.close()
+                    if allowed_names is not None and attach_name not in allowed_names:
+                        continue
+
+                    if decode_data and parsed_eml['attachment'][attach_count].get('raw'):
+                        f = open(f'{self.tmp_fldr}/{attach_name}', 'wb+')
+                        f.write(base64.b64decode(parsed_eml['attachment'][attach_count]['raw']))
+                        f.close()
+
                     attach_names.append(attach_name)
         log.info(f'Attachment list - {attach_names}')
 
@@ -167,7 +172,17 @@ class AttachmentParser:
     @staticmethod
     def parse_message_text(parsed_eml: dict):
         """Parse text from html-formatted email"""
-        return html2text.html2text(parsed_eml['body'][-1]['content'])
+        body = parsed_eml.get('body') or []
+        if len(body) == 0:
+            return ''
+
+        last_part = body[-1] if isinstance(body[-1], dict) else {}
+        message_content = last_part.get('content') or last_part.get('html') or last_part.get('text') or ''
+
+        if len(message_content) == 0:
+            return ''
+
+        return html2text.html2text(message_content)
 
     def get_message_text_and_header(self, parsed_eml: dict) -> (str, str):
         # TO-DO - split into two separate methods

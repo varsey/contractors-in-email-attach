@@ -31,7 +31,7 @@ class INNMessageProcessor(BaseMessageProcessor):
         password: str, 
         server: str, 
         mail_folder: str, 
-        db_path: str = 'message_ids.db'
+        db_path: str
     ):
         """
         Initialize the INNMessageProcessor.
@@ -147,8 +147,8 @@ class INNMessageProcessor(BaseMessageProcessor):
                     ):
                         print(header_from)
                     
-                    for k, v in organization_candidates.items():
-                        log.info(f'\n{k}:\n{v}')
+                    for k in organization_candidates.keys():
+                        log.info(f'Parsed organization candidate from: {k}')
                     orgs_dict.update(organization_candidates)
                 except Exception as ex:
                     self.error_processor(ex)
@@ -157,7 +157,7 @@ class INNMessageProcessor(BaseMessageProcessor):
             else:
                 raise MessageNotFoundError(f"Message-id {message_id} not found in database")
             
-            log.info(f'{len(orgs_dict)} - {orgs_dict.__str__()}')
+            log.info(f'Parsed organizations count: {len(orgs_dict)}')
             log.info('Parsing finished\n\n')
             clear_folders([f'{os.getcwd()}/temp/'])
             inns = [x['inn'] for x in orgs_dict.values()]

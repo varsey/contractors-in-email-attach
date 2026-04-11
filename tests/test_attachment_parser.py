@@ -62,5 +62,21 @@ class TestAttachmentParser(unittest.TestCase):
         self.assertIn("col1 col2", result)
         self.assertIn("val1 val2", result)
 
+    def test_parse_message_text_handles_missing_content(self):
+        parsed_eml = {
+            'body': [{'type': 'text/html'}]
+        }
+
+        result = self.parser.parse_message_text(parsed_eml)
+        self.assertEqual(result, '')
+
+    def test_parse_message_text_uses_text_fallback(self):
+        parsed_eml = {
+            'body': [{'text': 'plain body text'}]
+        }
+
+        result = self.parser.parse_message_text(parsed_eml)
+        self.assertIn('plain body text', result)
+
 if __name__ == '__main__':
     unittest.main()

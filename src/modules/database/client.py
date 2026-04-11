@@ -1,13 +1,23 @@
 import sqlite3
-from typing import Dict
+from typing import Dict, List, Union
 from contextlib import contextmanager
 
 from src.logger.Logger import log
-from src.modules.parsers.message.message_id_utils import normalize_message_id
+
+
+def normalize_message_id(message_id) -> str:
+    if message_id is None:
+        return ''
+
+    normalized = str(message_id).strip()
+    while normalized.startswith('<') and normalized.endswith('>') and len(normalized) > 1:
+        normalized = normalized[1:-1].strip()
+
+    return normalized
 
 
 class DatabaseClient:
-    def __init__(self, db_path: str = 'message_ids.db'):
+    def __init__(self, db_path: str):
         self.db_path = db_path
         self._init_database()
 
@@ -67,7 +77,7 @@ class DatabaseClient:
             log.error(f'Error saving message_id {message_id}: {e}')
             return False
 
-    def get_message_id(self, message_id: str) -> str | None:
+    def get_message_id(self, message_id: str) -> Union[str, None]:
         """
         Retrieve the mail_id associated with a message_id.
         
@@ -159,3 +169,34 @@ class DatabaseClient:
         except Exception as e:
             log.error(f'Error saving multiple message_ids: {e}')
             return 0
+
+    def get_message_ids_by_mail_ids(self, mail_ids: List[Union[bytes, str]]) -> Dict[str, str]:
+        """Retrieve message_id -> mail_id mappings for the given subset of mail IDs."""
+        try:
+            normalized_mail_ids = []
+            for mail_id in mail_ids:
+                value = mail_id.decode() if isinstance(mail_id, bytes) else str(mail_id)
+                value = value.strip()
+                if value:
+                    normalized_mail_ids.append(value)
+
+            if not normalized_mail_ids:
+                return {}
+
+            placeholders = ','.join('?' for _ in normalized_mail_ids)
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f'SELECT message_id, mail_id FROM message_ids WHERE mail_id IN ({placeholders})',
+                    normalized_mail_ids
+                )
+                results = cursor.fetchall()
+
+            return {
+                normalize_message_id(message_id): str(mail_id).strip()
+                for message_id, mail_id in results
+                if normalize_message_id(message_id)
+            }
+        except Exception as e:
+            log.error(f'Error retrieving message_ids by mail_ids: {e}')
+            return {}

@@ -2,6 +2,7 @@ import os
 import imaplib
 import time
 import random
+import gc
 from functools import wraps
 
 import eml_parser
@@ -75,14 +76,24 @@ class EmailClient(AttachmentParser):
                 log.error('No files to process!')
             return text
 
-        ep = eml_parser.EmlParser(include_raw_body=True, include_attachment_data=True)
+        ep = eml_parser.EmlParser(include_raw_body=False, include_attachment_data=False)
         message_text, attach_name, header_from = '', '', ''
         attach_names, attach_texts = [], {}
         for response_part in data:
             if isinstance(response_part, tuple):
                 parsed_eml = ep.decode_email_bytes(response_part[1])
                 message_text, header_from = self.get_message_text_and_header(parsed_eml)
-                attach_names = self.save_attachments_files(parsed_eml)
+                attach_names = self.save_attachments_files(parsed_eml, decode_data=False)
+
+                if attach_names:
+                    # Decode attachment bytes only when we actually have supported files to process.
+                    parsed_eml_with_data = eml_parser.EmlParser(
+                        include_raw_body=False,
+                        include_attachment_data=True
+                    ).decode_email_bytes(response_part[1])
+                    self.save_attachments_files(parsed_eml_with_data, decode_data=True, allowed_names=set(attach_names))
+                    del parsed_eml_with_data
+
                 for attach_name in attach_names:
                     try:
                         attachment_path = self.convert_attachment_file(attach_name)
@@ -92,6 +103,9 @@ class EmailClient(AttachmentParser):
                         log.error(f'{ex}')
                         self.error_processor(ex)
                         continue
+
+                del parsed_eml
+                gc.collect()
 
         return attach_texts, message_text, header_from
 

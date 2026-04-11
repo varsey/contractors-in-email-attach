@@ -41,7 +41,7 @@ class BaseMessageProcessor(EmailClient, ABC):
         password: str, 
         server: str, 
         mail_folder: str, 
-        db_path: str = 'message_ids.db'
+        db_path: str
     ):
         """
         Initialize the BaseMessageProcessor.
