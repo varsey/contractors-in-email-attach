@@ -17,6 +17,7 @@ from src.config.cfg import LAST_MESSAGES
 
 from .index_manager import MessageIndexManager
 from .exceptions import MessageNotFoundError
+from .message_id_utils import normalize_message_id
 
 
 class BaseMessageProcessor(EmailClient, ABC):
@@ -82,18 +83,20 @@ class BaseMessageProcessor(EmailClient, ABC):
         Raises:
             MessageNotFoundError: If the message ID is not found
         """
+        normalized_message_id = normalize_message_id(message_id)
+
         message_ids = self.index_manager.upd_index(
             self.mail_connector,
             self.mail_folder,
             self.setup_mail_connector,
-            message_id,
+            normalized_message_id,
             last_letters=last_letters
         )
         
-        if message_ids.get(message_id, 0) == 0:
-            raise MessageNotFoundError(f"Message-id {message_id} not found in database")
+        if message_ids.get(normalized_message_id, 0) == 0:
+            raise MessageNotFoundError(f"Message-id {normalized_message_id} not found in database")
         
-        data = self.see_msg(self.mail_connector, mail_id=message_ids[message_id])
+        data = self.see_msg(self.mail_connector, mail_id=message_ids[normalized_message_id])
         return self.get_message_attributes(data)
     
     def upd_index(self, message_id: Optional[str], last_letters: int = LAST_MESSAGES):
@@ -109,11 +112,12 @@ class BaseMessageProcessor(EmailClient, ABC):
         Returns:
             Dictionary of message_id -> mail_id mappings
         """
+        normalized_message_id = normalize_message_id(message_id)
         return self.index_manager.upd_index(
             self.mail_connector,
             self.mail_folder,
             self.setup_mail_connector,
-            message_id,
+            normalized_message_id,
             last_letters=last_letters
         )
     

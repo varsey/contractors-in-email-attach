@@ -3,6 +3,7 @@ from typing import Dict
 from contextlib import contextmanager
 
 from src.logger.Logger import log
+from src.modules.parsers.message.message_id_utils import normalize_message_id
 
 
 class DatabaseClient:
@@ -49,11 +50,16 @@ class DatabaseClient:
             True if saved successfully, False otherwise
         """
         try:
+            normalized_message_id = normalize_message_id(message_id)
+            normalized_mail_id = str(mail_id).strip()
+            if not normalized_message_id or not normalized_mail_id:
+                return False
+
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     'INSERT OR IGNORE INTO message_ids (message_id, mail_id) VALUES (?, ?)',
-                    (message_id, mail_id)
+                    (normalized_message_id, normalized_mail_id)
                 )
                 conn.commit()
                 return cursor.rowcount > 0
@@ -72,11 +78,15 @@ class DatabaseClient:
             The mail_id if found, None otherwise
         """
         try:
+            normalized_message_id = normalize_message_id(message_id)
+            if not normalized_message_id:
+                return None
+
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     'SELECT mail_id FROM message_ids WHERE message_id = ?',
-                    (message_id,)
+                    (normalized_message_id,)
                 )
                 result = cursor.fetchone()
                 return result[0] if result else None
@@ -108,7 +118,11 @@ class DatabaseClient:
                 cursor = conn.cursor()
                 cursor.execute('SELECT message_id, mail_id FROM message_ids')
                 results = cursor.fetchall()
-                return {message_id: mail_id for message_id, mail_id in results}
+                return {
+                    normalize_message_id(message_id): str(mail_id).strip()
+                    for message_id, mail_id in results
+                    if normalize_message_id(message_id)
+                }
         except Exception as e:
             log.error(f'Error retrieving all message_ids: {e}')
             return {}
@@ -124,12 +138,21 @@ class DatabaseClient:
             Number of records successfully inserted
         """
         try:
+            normalized_entries = []
+            for msg_id, mail_id in message_ids.items():
+                normalized_message_id = normalize_message_id(msg_id)
+                normalized_mail_id = str(mail_id).strip()
+                if normalized_message_id and normalized_mail_id:
+                    normalized_entries.append((normalized_message_id, normalized_mail_id))
+
+            if not normalized_entries:
+                return 0
+
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                data = [(msg_id, mail_id) for msg_id, mail_id in message_ids.items()]
                 cursor.executemany(
                     'INSERT OR IGNORE INTO message_ids (message_id, mail_id) VALUES (?, ?)',
-                    data
+                    normalized_entries
                 )
                 conn.commit()
                 return cursor.rowcount

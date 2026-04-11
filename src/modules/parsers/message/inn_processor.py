@@ -14,6 +14,7 @@ from src.config.cfg import LAST_MESSAGES
 
 from .base import BaseMessageProcessor
 from .exceptions import MessageNotFoundError, NetworkError
+from .message_id_utils import normalize_message_id
 
 
 class INNMessageProcessor(BaseMessageProcessor):
@@ -122,7 +123,7 @@ class INNMessageProcessor(BaseMessageProcessor):
             MessageNotFoundError: If the message ID is not found
             NetworkError: If connection to mail server fails
         """
-        message_id = message_id.strip("<>")
+        message_id = normalize_message_id(message_id)
         log.info(f'Updating message index for message_id: {message_id}')
 
         if len(message_id) <= 1:
@@ -144,7 +145,7 @@ class INNMessageProcessor(BaseMessageProcessor):
                         and
                         '*' in str(organization_candidates.values())
                     ):
-                        send_email_alert(header_from)
+                        print(header_from)
                     
                     for k, v in organization_candidates.items():
                         log.info(f'\n{k}:\n{v}')

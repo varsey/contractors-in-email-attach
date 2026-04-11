@@ -12,6 +12,7 @@ from src.modules.parsers.message import (
     MessageProcessor, 
     MessageProcessor2,
 )
+from src.modules.parsers.message.message_id_utils import normalize_message_id
 from src.config.cfg import Config
 from src.logger.Logger import log
 
@@ -30,7 +31,10 @@ def route_status():
 
 @app.route("/api/parsing/")
 def contractor_parser_parameter():
-    email_id = request.args.get('mid')
+    email_id = normalize_message_id(request.args.get('mid'))
+    if not email_id:
+        return jsonify({"error": "'mid' query parameter is required and must be non-empty"}), 400
+
     try:
         card = prc.process_email_by_id(message_id=email_id)
         gc.collect()
@@ -46,7 +50,10 @@ def contractor_parser_parameter():
 
 @app.route("/api/parsing/v2/")
 def contractor_parser_parameter_v2():
-    email_id = request.args.get('mid')
+    email_id = normalize_message_id(request.args.get('mid'))
+    if not email_id:
+        return jsonify({"error": "'mid' query parameter is required and must be non-empty"}), 400
+
     try:
         card = prc2.process_email_by_id_v2(message_id=email_id)
         # card = prc2.process_all_emails_v2()

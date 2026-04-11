@@ -57,6 +57,30 @@ class TestDatabaseClient(unittest.TestCase):
         self.assertEqual(len(all_ids), 3)
         self.assertEqual(all_ids["msg_a"], "1")
 
+    def test_normalizes_message_ids_and_mail_ids(self):
+        saved = self.client.save_message_id(" <TeSt-Id@example.com>\n", " 77 ")
+        self.assertTrue(saved)
+
+        retrieved_mail_id = self.client.get_message_id("TeSt-Id@example.com")
+        self.assertEqual(retrieved_mail_id, "77")
+
+        all_ids = self.client.get_all_message_ids()
+        self.assertIn("TeSt-Id@example.com", all_ids)
+        self.assertEqual(all_ids["TeSt-Id@example.com"], "77")
+
+    def test_save_multiple_message_ids_ignores_empty_after_normalization(self):
+        count = self.client.save_multiple_message_ids(
+            {
+                " <id-1> ": " 1 ",
+                "<>": "2",
+                "": "3",
+            }
+        )
+
+        self.assertEqual(count, 1)
+        all_ids = self.client.get_all_message_ids()
+        self.assertEqual(all_ids, {"id-1": "1"})
+
 
 if __name__ == '__main__':
     unittest.main()

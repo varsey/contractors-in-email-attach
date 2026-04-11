@@ -5,6 +5,7 @@ from typing import Optional, Dict, List
 from src.logger.Logger import log
 from src.modules.database.client import DatabaseClient
 from src.config.cfg import LAST_MESSAGES
+from .message_id_utils import normalize_message_id, extract_normalized_message_id
 
 
 class MessageIndexManager:
@@ -55,11 +56,7 @@ class MessageIndexManager:
                 header_data = response[1][0][1]
                 if isinstance(header_data, bytes):
                     header_data = header_data.decode('utf-8', errors='ignore')
-                # Parse Message-ID from header
-                for line in header_data.split('\n'):
-                    if line.lower().startswith('message-id:'):
-                        idx = line.split(':', 1)[1].strip().strip('<>')
-                        break
+                idx = extract_normalized_message_id(header_data)
         except (IndexError, TypeError, AttributeError, Exception) as ex:
             log.warning(f'Failed to extract Message-ID for mail_id {mail_id}: {ex}')
         
@@ -117,11 +114,7 @@ class MessageIndexManager:
                         if isinstance(header_data, bytes):
                             header_data = header_data.decode('utf-8', errors='ignore')
                         
-                        message_id = ''
-                        for line in header_data.split('\n'):
-                            if line.lower().startswith('message-id:'):
-                                message_id = line.split(':', 1)[1].strip().strip('<>')
-                                break
+                        message_id = extract_normalized_message_id(header_data)
                         
                         if mail_id_part and message_id:
                             result[mail_id_part] = message_id
@@ -158,7 +151,11 @@ class MessageIndexManager:
         
         # Filter out mail_ids that are already in the database
         existing_mail_ids = set(message_ids.values())
-        mail_ids_to_fetch = [mid for mid in mail_ids if mid not in existing_mail_ids]
+        mail_ids_to_fetch = [
+            mid
+            for mid in mail_ids
+            if (mid.decode() if isinstance(mid, bytes) else str(mid)) not in existing_mail_ids
+        ]
         
         if not mail_ids_to_fetch:
             log.info('No new messages to fetch')
@@ -190,10 +187,9 @@ class MessageIndexManager:
                     # Prepare new entries for batch save
                     new_entries = {}
                     for mail_id_str, msg_id in batch_results.items():
-                        if msg_id and msg_id not in message_ids.keys():
-                            # Convert mail_id back to bytes format for consistency
-                            mail_id_bytes = mail_id_str.encode() if isinstance(mail_id_str, str) else mail_id_str
-                            new_entries[msg_id] = mail_id_bytes
+                        normalized_msg_id = normalize_message_id(msg_id)
+                        if normalized_msg_id and normalized_msg_id not in message_ids.keys():
+                            new_entries[normalized_msg_id] = str(mail_id_str)
                     
                     # Batch save to database
                     if new_entries:
@@ -265,7 +261,9 @@ class MessageIndexManager:
         message_ids = self.db_client.get_all_message_ids()
         print(f'Existing message IDs count: {len(message_ids)}')
 
-        if message_id in message_ids.keys():
+        normalized_message_id = normalize_message_id(message_id)
+
+        if normalized_message_id in message_ids.keys():
             log.info('Message-id found in database')
             return message_ids
         else:
@@ -281,7 +279,7 @@ class MessageIndexManager:
 
         message_ids = self.db_client.get_all_message_ids()
 
-        if message_id in message_ids.keys():
+        if normalized_message_id in message_ids.keys():
             log.info('Message-id found in database')
             return message_ids
         else:

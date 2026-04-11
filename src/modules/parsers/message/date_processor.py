@@ -11,6 +11,7 @@ from src.modules.utils.utils import clear_folders
 
 from .base import BaseMessageProcessor
 from .exceptions import MessageNotFoundError
+from .message_id_utils import normalize_message_id
 
 
 class DateRangeMessageProcessor(BaseMessageProcessor):
@@ -72,7 +73,7 @@ class DateRangeMessageProcessor(BaseMessageProcessor):
         Raises:
             MessageNotFoundError: If the message ID is not found
         """
-        message_id = message_id.strip("<>")
+        message_id = normalize_message_id(message_id)
         log.info(f'Updating message index for message_id: {message_id}')
 
         if len(message_id) <= 1:

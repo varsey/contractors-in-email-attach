@@ -68,6 +68,15 @@ class TestMessageIndexManager(unittest.TestCase):
         
         result = self.index_manager.get_index(mock_connector, b'1')
         self.assertEqual(result, 'test123@example.com')
+
+    def test_get_index_supports_folded_message_id_header(self):
+        """Test get_index parses folded Message-ID header lines."""
+        mock_connector = Mock()
+        email_bytes = b'Message-ID: <test123@\r\n example.com>\r\nSubject: Test\r\n\r\nBody'
+        mock_connector.fetch.return_value = ('OK', [(None, email_bytes)])
+
+        result = self.index_manager.get_index(mock_connector, b'1')
+        self.assertEqual(result, 'test123@ example.com')
     
     def test_get_index_returns_empty_on_failure(self):
         """Test get_index returns empty string on failure."""
@@ -115,6 +124,21 @@ class TestINNMessageProcessor(unittest.TestCase):
         """Test org_structure with mixed valid/invalid INNs."""
         result = INNMessageProcessor.org_structure(['1234567890', '12345', '123456789012'])
         self.assertEqual(result, {'inn': ['1234567890', '123456789012']})
+
+    def test_process_email_by_id_uses_normalized_message_id_for_lookup(self):
+        """Test process_email_by_id normalizes message-id before index lookup."""
+        processor = INNMessageProcessor.__new__(INNMessageProcessor)
+        processor.mail_connector = MagicMock()
+        processor.upd_index = MagicMock(return_value={'test-id@example.com': '1'})
+        processor.see_msg = MagicMock(return_value=[(None, b'raw')])
+        processor.get_message_attributes = MagicMock(return_value=({}, 'mail-body', 'sender@example.com'))
+        processor.parse_attributes = MagicMock(return_value={'message': {'inn': []}, 'attach': {'inn': []}})
+
+        with patch('src.modules.parsers.message.inn_processor.clear_folders', lambda *_: None):
+            result = processor.process_email_by_id('  <test-id@example.com>\n')
+
+        self.assertIn('inns', result)
+        processor.upd_index.assert_called_once_with('test-id@example.com')
 
 
 class TestDateRangeMessageProcessor(unittest.TestCase):
