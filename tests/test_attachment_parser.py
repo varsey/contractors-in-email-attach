@@ -46,12 +46,52 @@ class TestAttachmentParser(unittest.TestCase):
     def test_parse_pdf_text(self, mock_open, mock_pdf_reader):
         mock_reader = MagicMock()
         mock_pdf_reader.return_value = mock_reader
-        mock_page = MagicMock()
-        mock_page.extract_text.return_value = "PDF Text content"
-        mock_reader.pages = [mock_page]
-        
+        mock_page_1 = MagicMock()
+        mock_page_1.extract_text.return_value = "PDF Text content"
+        mock_page_2 = MagicMock()
+        mock_page_2.extract_text.return_value = "Second page"
+        mock_reader.pages = [mock_page_1, mock_page_2]
+
         result = self.parser.parse_pdf("test.pdf")
-        self.assertEqual(result, "PDF Text content")
+        self.assertEqual(result, "PDF Text content Second page")
+
+    @patch('src.modules.parsers.attachment.gc.collect')
+    @patch('src.modules.parsers.attachment.pytesseract.image_to_string')
+    @patch('src.modules.parsers.attachment.Image.open')
+    @patch('src.modules.parsers.attachment.convert_from_path')
+    @patch('src.modules.parsers.attachment.PyPDF2.PdfReader')
+    @patch('builtins.open', new_callable=unittest.mock.mock_open)
+    def test_parse_pdf_ocr_fallback_by_page(
+            self,
+            mock_open,
+            mock_pdf_reader,
+            mock_convert_from_path,
+            mock_image_open,
+            mock_image_to_string,
+            mock_gc_collect,
+    ):
+        mock_reader = MagicMock()
+        mock_pdf_reader.return_value = mock_reader
+        mock_page_1 = MagicMock()
+        mock_page_1.extract_text.return_value = ""
+        mock_page_2 = MagicMock()
+        mock_page_2.extract_text.return_value = ""
+        mock_reader.pages = [mock_page_1, mock_page_2]
+
+        page_image_1 = MagicMock()
+        page_image_2 = MagicMock()
+        mock_convert_from_path.side_effect = [[page_image_1], [page_image_2]]
+
+        image_context = MagicMock()
+        mock_image_open.return_value.__enter__.return_value = image_context
+        mock_image_to_string.side_effect = ["ocr page 1", "ocr page 2"]
+
+        result = self.parser.parse_pdf("test.pdf")
+
+        self.assertIn("ocr page 1", result)
+        self.assertIn("ocr page 2", result)
+        self.assertEqual(mock_convert_from_path.call_count, 2)
+        mock_gc_collect.assert_called()
 
     @patch('src.modules.parsers.attachment.csv.reader')
     @patch('builtins.open', new_callable=unittest.mock.mock_open)

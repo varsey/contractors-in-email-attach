@@ -1,3 +1,4 @@
+import gc
 import os
 import csv
 import base64
@@ -79,26 +80,38 @@ class AttachmentParser:
     def parse_pdf(self, attachment_path) -> str:
         """Parser via PyPDF2"""
         filename = ''.join(attachment_path.split('.')[:-1]) + '.pdf'
-        document = open(filename, 'rb')
-        pdf_reader = PyPDF2.PdfReader(document)
-        page = pdf_reader.pages[0]
-        try:
-            full_text = page.extract_text()
-        except UnicodeDecodeError as ex:
-            full_text = ''
-            self.error_processor(ex)
+        full_text_parts = []
+        pages_count = 0
+
+        with open(filename, 'rb') as document:
+            pdf_reader = PyPDF2.PdfReader(document)
+            pages_count = len(pdf_reader.pages)
+            for page in pdf_reader.pages:
+                try:
+                    extracted_text = page.extract_text() or ''
+                    if extracted_text:
+                        full_text_parts.append(extracted_text)
+                except UnicodeDecodeError as ex:
+                    self.error_processor(ex)
+
+        full_text = ' '.join(full_text_parts)
 
         # OCR parsing
         if len(full_text) == 0:
-            try:
-                pdf_pages = convert_from_path(filename, 500)
-            except Image.DecompressionBombError:
-                pdf_pages = []
+            for page_enumeration in range(1, pages_count + 1):
+                try:
+                    pdf_pages = convert_from_path(filename, 500, first_page=page_enumeration, last_page=page_enumeration)
+                except Image.DecompressionBombError:
+                    continue
 
-            for page_enumeration, page in enumerate(pdf_pages, start=1):
-                image_file = f"{self.tmp_fldr}/page_{page_enumeration:04}.jpg"
-                page.save(image_file, "JPEG")
-                full_text += ' ' + pytesseract.image_to_string(Image.open(image_file), lang="rus")
+                for page in pdf_pages:
+                    image_file = f"{self.tmp_fldr}/page_{page_enumeration:04}.jpg"
+                    page.save(image_file, "JPEG")
+                    with Image.open(image_file) as image:
+                        full_text += ' ' + pytesseract.image_to_string(image, lang="rus")
+
+                del pdf_pages
+                gc.collect()
 
         return full_text
 
